@@ -4,6 +4,7 @@ import com.example.demo.entity.Player;
 import com.example.demo.entity.Rating;
 import com.example.demo.repository.PlayerRepository;
 import com.example.demo.repository.RatingRepository;
+import org.jspecify.annotations.NonNull;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.listener.ItemReadListener;
@@ -17,7 +18,6 @@ import org.springframework.batch.infrastructure.item.xml.StaxEventItemReader;
 import org.springframework.batch.infrastructure.item.xml.builder.StaxEventItemReaderBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.oxm.jaxb.Jaxb2Marshaller;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -42,7 +42,8 @@ public class FideImportJob {
                            ItemProcessor<Player, Player> processor,
                            ItemWriter<Player> writer){
         return new StepBuilder("importPlayersStep", jobRepository)
-                .<Player, Player>chunk(500, transactionManager)
+                .<Player, Player>chunk(500)
+                .transactionManager(transactionManager)
                 .reader(reader)
                 .processor(processor)
                 .writer(writer)
@@ -51,7 +52,7 @@ public class FideImportJob {
                 .skipLimit(10)
                 .listener(new ItemReadListener<Player>() {
                     @Override
-                    public void onReadError(Exception ex) {
+                    public void onReadError(@NonNull Exception ex) {
                         System.out.println("Error reading player: " + ex.getMessage());
                     }
                 })
