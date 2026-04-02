@@ -1,1 +1,15 @@
-services: {}
+services:
+  postgres:
+    image: 'postgres:17'
+    container_name: chess-db
+    restart: unless-stopped
+    environment:
+      - 'POSTGRES_DB=chess'
+      - 'POSTGRES_PASSWORD=secret'
+      - 'POSTGRES_USER=peaceful'
+    ports:
+      - '5433:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+volumes:
+  postgres_data:
