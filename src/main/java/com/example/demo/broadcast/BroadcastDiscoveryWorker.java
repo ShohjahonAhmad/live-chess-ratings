@@ -114,6 +114,10 @@ public class BroadcastDiscoveryWorker {
     private void saveTournamentRounds(BroadcastDTO broadcast, Tournament tournament) {
         for (BroadcastDTO.RoundDTO round : broadcast.rounds) {
             // Skip round if critical fields are missing
+            if(!round.rated) {
+                logger.warn("[WARN] Skipping round {}: not rated", round.name != null ? round.name : "unknown");
+                continue;
+            }
             if (round.id == null || round.name == null) {
                 logger.warn("[WARN] Skipping round: missing id or name");
                 continue;
@@ -126,8 +130,11 @@ public class BroadcastDiscoveryWorker {
                 roundDb.setSlug(round.slug);
             }
             roundDb.setStatus(round.finished ? Status.FINISHED : round.ongoing ? Status.ONGOING : Status.UNSTARTED);
-            if(round.startsAt > 0) {
+            if(round.startsAt != null && round.startsAt > 0) {
                 roundDb.setStartsAt(Instant.ofEpochMilli(round.startsAt));
+            }
+            if(round.finishedAt != null && round.finishedAt > 0) {
+                roundDb.setEndsAt(Instant.ofEpochMilli(round.finishedAt));
             }
             roundDb.setTournament(tournament);
 

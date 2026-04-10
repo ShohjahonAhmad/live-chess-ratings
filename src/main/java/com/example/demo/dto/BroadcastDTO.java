@@ -26,7 +26,9 @@ public class BroadcastDTO {
         public String slug;
         public boolean finished;
         public boolean ongoing;
-        public long startsAt;
+        public Long startsAt;
+        public Long finishedAt;
+        public boolean rated;
     }
     
     public static class BroadcastInfoDTO {

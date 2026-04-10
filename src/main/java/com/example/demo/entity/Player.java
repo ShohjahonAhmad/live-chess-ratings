@@ -52,7 +52,7 @@ public class Player {
     @Column(name = "rapid_k")
     private Short rapidK;
 
-    @XmlElement(name = "blitz")
+    @XmlElement(name = "blitz_k")
     @Column(name = "blitz_k")
     private Short blitzK;
 
