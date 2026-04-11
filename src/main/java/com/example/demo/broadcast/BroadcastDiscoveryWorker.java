@@ -98,12 +98,23 @@ public class BroadcastDiscoveryWorker {
                             }
                         }
 
-                        Tournament existing = tournamentRepository.findById(tournament.getId()).orElse(null);
+                        Tournament existingTournament = tournamentRepository.findById(tournament.getId()).orElse(new Tournament());
+                        if (existingTournament.getId() == null) {
+                            existingTournament.setId(tournament.getId());
+                        }
+                        existingTournament.setName(tournament.getName());
+                        existingTournament.setSlug(tournament.getSlug());
+                        existingTournament.setDescription(tournament.getDescription());
+                        existingTournament.setStartsAt(tournament.getStartsAt());
+                        existingTournament.setEndsAt(tournament.getEndsAt());
+                        existingTournament.setTc(tournament.getTc());
+                        existingTournament.setFormat(tournament.getFormat());
+                        existingTournament.setLocation(tournament.getLocation());
 
-                        if(existing == null || !existing.equals(tournament)) tournamentRepository.save(tournament);
+                        tournamentRepository.save(existingTournament);
 
                         if(broadcast.rounds != null) {
-                            saveTournamentRounds(broadcast, tournament);
+                            saveTournamentRounds(broadcast, existingTournament);
                         }
                     },
                     error -> logger.error("[ERROR] Error discovering broadcasts: {}", error.getMessage(), error),
@@ -123,26 +134,25 @@ public class BroadcastDiscoveryWorker {
                 continue;
             }
 
-            BroadcastRound roundDb = new BroadcastRound();
-            roundDb.setId(round.id);
-            roundDb.setName(round.name);
-            if(round.slug != null) {
-                roundDb.setSlug(round.slug);
+            BroadcastRound existing = broadcastRoundRepository.findById(round.id).orElse(new BroadcastRound());
+            if (existing.getId() == null) {
+                existing.setId(round.id);
             }
-            roundDb.setStatus(round.finished ? Status.FINISHED : round.ongoing ? Status.ONGOING : Status.UNSTARTED);
+            
+            existing.setName(round.name);
+            if(round.slug != null) {
+                existing.setSlug(round.slug);
+            }
+            existing.setStatus(round.finished ? Status.FINISHED : round.ongoing ? Status.ONGOING : Status.UNSTARTED);
             if(round.startsAt != null && round.startsAt > 0) {
-                roundDb.setStartsAt(Instant.ofEpochMilli(round.startsAt));
+                existing.setStartsAt(Instant.ofEpochMilli(round.startsAt));
             }
             if(round.finishedAt != null && round.finishedAt > 0) {
-                roundDb.setEndsAt(Instant.ofEpochMilli(round.finishedAt));
+                existing.setEndsAt(Instant.ofEpochMilli(round.finishedAt));
             }
-            roundDb.setTournament(tournament);
+            existing.setTournament(tournament);
 
-            BroadcastRound existing = broadcastRoundRepository.findById(roundDb.getId()).orElse(null);
-            if(existing == null || !existing.equals(roundDb)) broadcastRoundRepository.save(roundDb);
+            broadcastRoundRepository.save(existing);
         }
     }
-
 }
-
-

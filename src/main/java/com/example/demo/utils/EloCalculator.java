@@ -18,9 +18,25 @@ public class EloCalculator {
      * @param k K-factor
      * @param actualScore result of the game for a player (1.0 for a win, 0.5 for a draw, and 0.0 for a loss)
      * @param expectedScore win probability between 0.0 and 1.0
-     * @return The rating change (rating gain/loss)
+     * @return The rating change (rating gain/loss), rounded to one decimal place
      */
     public double calculateRatingChange(int k, double actualScore, double expectedScore) {
-        return k * (actualScore - expectedScore);
+        double rawChange = k * (actualScore - expectedScore);
+        return Math.round(rawChange * 10.0) / 10.0;
+    }
+
+    /**
+     * Finds Time Control Type (blitz, rapid, or std)
+     * @param time total time given in the beginning of the game
+     * @return time control type
+     */
+    public String findTimeControlType(double time) {
+        if(time <= 10.0) {
+            return "blitz";
+        } else if( time < 45.0){
+            return "rapid";
+        } else {
+            return "std";
+        }
     }
 }
