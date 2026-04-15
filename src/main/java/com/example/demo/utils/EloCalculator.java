@@ -2,15 +2,37 @@ package com.example.demo.utils;
 
 public class EloCalculator {
 
+    private static final int[] FIDE_D_TABLE = {
+            3, 10, 17, 24, 31, 38, 46, 53, 61, 68, 76, 83, 91, 98, 106, 113, 121, 129, 137, 145,
+            153, 162, 170, 179, 188, 197, 206, 215, 225, 235, 245, 256, 267, 278, 290, 302, 315,
+            328, 344, 357, 374, 391, 411, 432, 456, 484, 517, 559, 619, 735
+    };
 
     /**
-     * Calculates the expected score for player A against player B based on their ratings.
+     * Calculates the expected score for player A against player B based on their ratings using the official FIDE table.
      * @param ratingA Recent monthly rating of player A
      * @param ratingB Recent monthly rating of player B
      * @return The expected score (win probability) between 0.0 and 1.0
      */
     public double calculateExpectedScore(int ratingA, int ratingB){
-        return 1.0 / (1.0 + Math.pow(10.0, (ratingB - ratingA) / 400.0));
+        int diff = ratingA - ratingB;
+        boolean aIsHigher = diff >= 0;
+        int d = Math.abs(diff);
+
+        // FIDE 400-point rule (a difference of > 400 is treated as exactly 400)
+        // The "Hikaru Rule" Amendment (2025): Removed for players rated 2650 or higher
+        if (d > 400 && ratingA < 2650) {
+            d = 400;
+        }
+
+        double pd = 0.50;
+        int i = 0;
+        while (i < FIDE_D_TABLE.length && d > FIDE_D_TABLE[i]) {
+            pd += 0.01;
+            i++;
+        }
+
+        return aIsHigher ? pd : 1.0 - pd;
     }
 
     /**

@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Data
 @NoArgsConstructor @AllArgsConstructor
@@ -40,5 +41,24 @@ public class Tournament {
 
     @OneToMany(mappedBy = "tournament", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<BroadcastRound> rounds = new ArrayList<>();
-}
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Tournament that)) return false;
+        return Objects.equals(id, that.getId()) &&
+               Objects.equals(name, that.getName()) && 
+               Objects.equals(slug, that.getSlug()) && 
+               Objects.equals(format, that.getFormat()) && 
+               Objects.equals(tc, that.getTc()) && 
+               Objects.equals(location, that.getLocation()) && 
+               Objects.equals(description, that.getDescription()) && 
+               Objects.equals(startsAt, that.getStartsAt()) && 
+               Objects.equals(endsAt, that.getEndsAt());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, name, slug, format, tc, location, description, startsAt, endsAt);
+    }
+}
