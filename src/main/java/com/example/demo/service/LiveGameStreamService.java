@@ -8,14 +8,13 @@ import com.example.demo.utils.Status;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.Disposable;
 
 
-import java.sql.Date;
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -31,20 +30,27 @@ public class LiveGameStreamService {
     private static final Pattern BLACK_RATING = Pattern.compile("\\[BlackElo \"(\\d+)\"\\]");
     private static final Pattern TIME_CONTROL_PATTERN = Pattern.compile("\\[TimeControl \"([^\"]+)\"\\]");
 
-    ConcurrentHashMap<String, Disposable> activeStreams = new ConcurrentHashMap<>();
     private final WebClient webClient;
     private final BroadcastRoundRepository broadcastRoundRepository;
     private final GameRepository gameRepository;
     private final PlayerRepository playerRepository;
-    private final RatingRepository ratingRepository;
     private final LiveRatingRepository liveRatingRepository;
+    
+    // LRU Cache to hold a maximum of 10,000 ignored games to prevent memory leaks
+    private final Map<String, Boolean> ignoredGames = Collections.synchronizedMap(
+            new LinkedHashMap<String, Boolean>(10000, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
+                    return size() > 10000; 
+                }
+            }
+    );
 
-    public LiveGameStreamService(WebClient webClient, BroadcastRoundRepository broadcastRoundRepository, GameRepository gameRepository, PlayerRepository playerRepository, RatingRepository ratingRepository, LiveRatingRepository liveRatingRepository) {
+    public LiveGameStreamService(WebClient webClient, BroadcastRoundRepository broadcastRoundRepository, GameRepository gameRepository, PlayerRepository playerRepository, LiveRatingRepository liveRatingRepository) {
         this.webClient = webClient;
         this.broadcastRoundRepository = broadcastRoundRepository;
         this.gameRepository = gameRepository;
         this.playerRepository = playerRepository;
-        this.ratingRepository = ratingRepository;
         this.liveRatingRepository = liveRatingRepository;
     }
 
@@ -52,49 +58,36 @@ public class LiveGameStreamService {
     public void refreshStreams() {
         List<BroadcastRound> rounds = broadcastRoundRepository.findByStatus(Status.ONGOING);
 
-        for(BroadcastRound round : rounds){
-            if(!activeStreams.containsKey(round.getId())){
-                if (activeStreams.size() >= 4) {
-                    System.out.println("Lichess API stream limit reached. Staying at 4 concurrent streams max.");
-                    break;
-                }
+        reactor.core.publisher.Flux.fromIterable(rounds)
+                .concatMap(round -> {
+                    StringBuilder pgnBuffer = new StringBuilder();
+                    return webClient.get()
+                            .uri("/api/stream/broadcast/round/" + round.getId() + ".pgn")
+                            .retrieve()
+                            .bodyToFlux(String.class)
+                            .take(java.time.Duration.ofSeconds(5)) // Fetch for 5 seconds per round sequentially
+                            .doOnNext(line -> {
+                                // Process each game line for this round
+                                pgnBuffer.append(line).append("\n");
 
-                StringBuilder pgnBuffer = new StringBuilder();
-                Disposable stream = webClient.get()
-                        .uri("/api/stream/broadcast/round/" + round.getId() + ".pgn")
-                        .retrieve()
-                        .bodyToFlux(String.class)
-                        .doFinally(signalType -> {
-                            activeStreams.remove(round.getId());
-                            // Muted to avoid spamming the console on natural closures
-                             System.out.println("Removed stream for round " + round.getName() + " from active streams.");
-                        })
-                        .subscribe(line -> {
-                            // Process each game line for this round
-                            pgnBuffer.append(line).append("\n");
-
-                            if(line.trim().isEmpty() && pgnBuffer.length() > 5) {
-                                String completePgn = pgnBuffer.toString().trim();
-                                
-                                // If the processed string DOES NOT end with a bracket ']', 
-                                // it means we've successfully buffered past the headers and captured the move text/result!
-                                if (!completePgn.endsWith("]")) {
-                                    processPgn(completePgn, round);
-                                    pgnBuffer.setLength(0);
+                                if(line.trim().isEmpty() && pgnBuffer.length() > 5) {
+                                    String completePgn = pgnBuffer.toString().trim();
+                                    
+                                    if (!completePgn.endsWith("]")) {
+                                        processPgn(completePgn, round);
+                                        pgnBuffer.setLength(0);
+                                    }
                                 }
-                            }
-
-                        }, error -> {
-                            // Handle errors in the stream
-                            System.err.println("Error in game stream for round " + round.getName() + ": " + error.getMessage());
-                        }, () -> {
-                            // Stream completed
-                            System.out.println("Game stream for round " + round.getName() + " completed.");
-                        });
-                
-                activeStreams.put(round.getId(), stream);
-            }
-        }
+                            })
+                            .doOnError(error -> {
+                                System.err.println("Error in game stream for round " + round.getName() + ": " + error.getMessage());
+                            })
+                            .doFinally(signalType -> {
+                                System.out.println("Ended stream for round " + round.getName() + " from " + round.getTournament().getName() + " with signal: " + signalType);
+                            })
+                            .then(); // ensures we fully complete this stream before moving to the next round
+                })
+                .blockLast(); // Blocks the scheduled thread until all rounds are visited sequentially
     }
 
     private String extractMatch(String text, Pattern pattern, int group) {
@@ -109,7 +102,7 @@ public class LiveGameStreamService {
         if(result == null || result.contains("*")) return;
         String gameId = extractMatch(pgn, ID_PATTERN, 1);
 
-        if(gameId == null || gameRepository.existsById(gameId)) return;
+        if(gameId == null || ignoredGames.containsKey(gameId) || gameRepository.existsById(gameId)) return;
 
         Tournament tournament = round.getTournament();
 
@@ -123,7 +116,20 @@ public class LiveGameStreamService {
         short blackRating = Short.parseShort(blackRatingPgn != null ? blackRatingPgn : "0");
         String timeControl = extractMatch(pgn, TIME_CONTROL_PATTERN, 1);
 
-        System.out.println(activeStreams.keySet());
+        Player whitePlayer = null;
+        if(whiteFideId != null) {
+            whitePlayer = playerRepository.findById(Long.valueOf(whiteFideId)).orElse(null);
+        }
+        Player blackPlayer = null;
+        if(blackFideId != null) {
+            blackPlayer = playerRepository.findById(Long.valueOf(blackFideId)).orElse(null);
+        }
+
+        if(whitePlayer == null && blackPlayer == null) {
+            ignoredGames.put(gameId, true);
+            return;
+        }
+
         System.out.println("Received game for round " + round.getName() + ": " + gameId + " (" + date + ") " + whiteFideId + " vs " + blackFideId + " [" + result + ", " + timeControl + "]");
 
         Game game = new Game();
@@ -139,25 +145,11 @@ public class LiveGameStreamService {
         game.setRound(round);
 
         EloCalculator eloCalculator = new EloCalculator();
-        Player whitePlayer = null;
-        if(game.getWhiteFideId() != null) {
-            whitePlayer = playerRepository.findById(game.getWhiteFideId()).orElse(null);
-        }
-        Player blackPlayer = null;
-        if(game.getBlackFideId() != null) {
-            blackPlayer = playerRepository.findById(game.getBlackFideId()).orElse(null);
-        }
 
         String tcType = "std";
         if (timeControl != null) {
             try {
-                double timeValue = Double.parseDouble(timeControl.split(" ")[0]);
-                tcType = eloCalculator.findTimeControlType(timeValue);
-            } catch (Exception e) {
-                // Ignore parse errors safely
-            }
-            try {
-                double timeValue = Double.parseDouble(timeControl.split("\\+")[0]);
+                double timeValue = getFirstNumberFromString(timeControl);
                 tcType = eloCalculator.findTimeControlType(timeValue);
             } catch (Exception e) {
                 // Ignore parse errors safely
@@ -191,16 +183,16 @@ public class LiveGameStreamService {
             if (liveRating != null) {
                 switch (tcType) {
                     case "blitz" -> {
-                        liveRating.setBlitzRating(liveRating.getBlitzRating() != null ? liveRating.getBlitzRating() + game.getWhiteRatingChange() : game.getWhiteRatingChange());
-                        liveRating.setBlitzChange((liveRating.getBlitzChange() != null ? liveRating.getBlitzChange() : 0.0) + game.getWhiteRatingChange());
+                        liveRating.setBlitzRating(addAndRound(liveRating.getBlitzRating(), game.getWhiteRatingChange()));
+                        liveRating.setBlitzChange(addAndRound(liveRating.getBlitzChange(), game.getWhiteRatingChange()));
                     }
                     case "rapid" -> {
-                        liveRating.setRapidRating(liveRating.getRapidRating() != null ? liveRating.getRapidRating() + game.getWhiteRatingChange() : game.getWhiteRatingChange());
-                        liveRating.setRapidChange((liveRating.getRapidChange() != null ? liveRating.getRapidChange() : 0.0) + game.getWhiteRatingChange());
+                        liveRating.setRapidRating(addAndRound(liveRating.getRapidRating(), game.getWhiteRatingChange()));
+                        liveRating.setRapidChange(addAndRound(liveRating.getRapidChange(), game.getWhiteRatingChange()));
                     }
                     case "std"   -> {
-                        liveRating.setStdRating(liveRating.getStdRating() != null ? liveRating.getStdRating() + game.getWhiteRatingChange() : game.getWhiteRatingChange());
-                        liveRating.setStdChange((liveRating.getStdChange() != null ? liveRating.getStdChange() : 0.0) + game.getWhiteRatingChange());
+                        liveRating.setStdRating(addAndRound(liveRating.getStdRating(), game.getWhiteRatingChange()));
+                        liveRating.setStdChange(addAndRound(liveRating.getStdChange(), game.getWhiteRatingChange()));
                     }
                 }
                 liveRatingRepository.save(liveRating);
@@ -223,24 +215,41 @@ public class LiveGameStreamService {
             if (liveRating != null) {
                 switch (tcType) {
                     case "blitz" -> {
-                        liveRating.setBlitzRating(liveRating.getBlitzRating() != null ? liveRating.getBlitzRating() + game.getBlackRatingChange() : game.getBlackRatingChange());
-                        liveRating.setBlitzChange((liveRating.getBlitzChange() != null ? liveRating.getBlitzChange() : 0.0) + game.getBlackRatingChange());
+                        liveRating.setBlitzRating(addAndRound(liveRating.getBlitzRating(), game.getBlackRatingChange()));
+                        liveRating.setBlitzChange(addAndRound(liveRating.getBlitzChange(), game.getBlackRatingChange()));
                     }
                     case "rapid" -> {
-                        liveRating.setRapidRating(liveRating.getRapidRating() != null ? liveRating.getRapidRating() + game.getBlackRatingChange() : game.getBlackRatingChange());
-                        liveRating.setRapidChange((liveRating.getRapidChange() != null ? liveRating.getRapidChange() : 0.0) + game.getBlackRatingChange());
+                        liveRating.setRapidRating(addAndRound(liveRating.getRapidRating(), game.getBlackRatingChange()));
+                        liveRating.setRapidChange(addAndRound(liveRating.getRapidChange(), game.getBlackRatingChange()));
                     }
                     case "std"   -> {
-                        liveRating.setStdRating(liveRating.getStdRating() != null ? liveRating.getStdRating() + game.getBlackRatingChange() : game.getBlackRatingChange());
-                        liveRating.setStdChange((liveRating.getStdChange() != null ? liveRating.getStdChange() : 0.0) + game.getBlackRatingChange());
+                        liveRating.setStdRating(addAndRound(liveRating.getStdRating(), game.getBlackRatingChange()));
+                        liveRating.setStdChange(addAndRound(liveRating.getStdChange(), game.getBlackRatingChange()));
                     }
                 }
                 liveRatingRepository.save(liveRating);
             }
         }
 
-        if(whitePlayer == null && blackPlayer == null) return;
-
         gameRepository.save(game);
+    }
+
+    private double addAndRound(Double current, double change) {
+        double val = (current != null ? current : 0.0) + change;
+        return Math.round(val * 10.0) / 10.0;
+    }
+
+    private double getFirstNumberFromString(String timeControl) {
+        double result = 0;
+
+        for(int i = 0; i < timeControl.length(); i++) {
+            char c = timeControl.charAt(i);
+
+            if(!Character.isDigit(c)) break;
+
+            result = result * 10 + Integer.parseInt(String.valueOf(c));
+        }
+
+        return result;
     }
 }

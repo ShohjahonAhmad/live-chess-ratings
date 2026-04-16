@@ -115,16 +115,17 @@ public class BroadcastDiscoveryWorker {
         logger.info("[INFO] Starting cleanup for ONGOING rounds...");
         java.util.List<BroadcastRound> ongoingRounds = broadcastRoundRepository.findByStatus(Status.ONGOING);
 
-        for (BroadcastRound round : ongoingRounds) {
-            String tourSlug = round.getTournament() != null && round.getTournament().getSlug() != null ? round.getTournament().getSlug() : "-";
-            String roundSlug = round.getSlug() != null ? round.getSlug() : "-";
+        reactor.core.publisher.Flux.fromIterable(ongoingRounds)
+                .concatMap(round -> {
+                    String tourSlug = round.getTournament() != null && round.getTournament().getSlug() != null ? round.getTournament().getSlug() : null;
+                    String roundSlug = round.getSlug() != null ? round.getSlug() : null;
+                    if(tourSlug == null || roundSlug == null) return reactor.core.publisher.Mono.empty();
 
-            webClient.get()
-                    .uri("/api/broadcast/{tourSlug}/{roundSlug}/{roundId}", tourSlug, roundSlug, round.getId())
-                    .retrieve()
-                    .bodyToMono(TopDTO.BroadcastDTO.class)
-                    .subscribe(
-                            dto -> {
+                    return webClient.get()
+                            .uri("/api/broadcast/{tourSlug}/{roundSlug}/{roundId}", tourSlug, roundSlug, round.getId())
+                            .retrieve()
+                            .bodyToMono(TopDTO.BroadcastDTO.class)
+                            .doOnNext(dto -> {
                                 if (dto.round != null) {
                                     if (dto.round.finished) {
                                         logger.info("[INFO] Round {} (ID: {}) has finished, updating status.", round.getName(), round.getId());
@@ -135,10 +136,11 @@ public class BroadcastDiscoveryWorker {
                                         broadcastRoundRepository.save(round);
                                     }
                                 }
-                            },
-                            error -> logger.error("[ERROR] Failed to fetch round {} for cleanup: {}", round.getId(), error.getMessage())
-                    );
-        }
+                            })
+                            .doOnError(error -> logger.error("[ERROR] Failed to fetch round {} for cleanup: {}", round.getId(), error.getMessage()))
+                            .onErrorResume(e -> reactor.core.publisher.Mono.empty()); // Swallow error so the loop continues
+                })
+                .blockLast();
     }
 
     private void saveTournamentRound(TopDTO.BroadcastDTO broadcast, Tournament tournament) {
