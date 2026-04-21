@@ -76,8 +76,6 @@ public class GameProcessingService {
         short blackRating = Short.parseShort(blackRatingPgn != null ? blackRatingPgn : "0");
         String timeControl = extractMatch(pgn, TIME_CONTROL_PATTERN, 1);
 
-        logger.info("Received game for round {}: {} ({}) {} vs {} [{}, {}]", round.getName(), gameId, today, whiteFideId, blackFideId, result, timeControl);
-
         Game game = new Game();
 
         game.setId(gameId);
@@ -178,6 +176,7 @@ public class GameProcessingService {
         }
 
         gameRepository.save(game);
+        logger.debug("Game {} saved: {} vs {} - Result: {}", gameId, whiteFideId, blackFideId, result);
     }
 
     private String extractMatch(String text, Pattern pattern, int group) {

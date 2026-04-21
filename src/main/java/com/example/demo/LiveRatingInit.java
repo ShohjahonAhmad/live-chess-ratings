@@ -6,7 +6,10 @@ import com.example.demo.entity.Rating;
 import com.example.demo.repository.LiveRatingRepository;
 import com.example.demo.repository.PlayerRepository;
 import com.example.demo.repository.RatingRepository;
+import com.example.demo.service.GameProcessingService;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +18,8 @@ import java.util.List;
 
 @Component
 public class LiveRatingInit implements CommandLineRunner {
+
+    private static final Logger logger = LoggerFactory.getLogger(LiveRatingInit.class);
 
     private final PlayerRepository playerRepository;
     private final RatingRepository ratingRepository;

@@ -128,7 +128,7 @@ public class BroadcastDiscoveryWorker {
                             .doOnNext(dto -> {
                                 if (dto.round != null) {
                                     if (dto.round.finished) {
-                                        logger.info("[INFO] Round {} (ID: {}) has finished, updating status.", round.getName(), round.getId());
+                                        logger.debug("Round {} (ID: {}) has finished, updating status.", round.getName(), round.getId());
                                         round.setStatus(Status.FINISHED);
                                         if (dto.round.finishedAt != null && dto.round.finishedAt > 0) {
                                             round.setEndsAt(Instant.ofEpochMilli(dto.round.finishedAt));
@@ -148,11 +148,11 @@ public class BroadcastDiscoveryWorker {
             TopDTO.BroadcastDTO.RoundDTO round = broadcast.round;
             logger.info("Processing round: {}, {}", round.name != null ? round.name : "unknown", round.ongoing);
             if(!round.rated) {
-                logger.warn("[WARN] Skipping round {}: not rated", round.name != null ? round.name : "unknown");
+                logger.warn("Skipping round {}: not rated", round.name != null ? round.name : "unknown");
                 return;
             }
             if (round.id == null || round.name == null) {
-                logger.warn("[WARN] Skipping round: missing id or name");
+                logger.warn("Skipping round: missing id or name");
                 return;
             }
 

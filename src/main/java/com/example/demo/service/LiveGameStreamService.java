@@ -2,23 +2,17 @@ package com.example.demo.service;
 
 import com.example.demo.entity.*;
 import com.example.demo.repository.*;
-import com.example.demo.utils.EloCalculator;
-import com.example.demo.utils.Result;
 import com.example.demo.utils.Status;
-import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.time.LocalDate;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
 public class LiveGameStreamService {
