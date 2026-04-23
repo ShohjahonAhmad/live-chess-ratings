@@ -12,7 +12,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.util.retry.Retry;
 
+import java.time.Duration;
 import java.time.Instant;
 
 @Component
@@ -32,12 +34,17 @@ public class BroadcastDiscoveryWorker {
 
     @Scheduled(fixedDelay = 300000) // Run every 5 minutes
     public void discoverBroadcasts() {
-        logger.info("[INFO] Starting broadcast discovery...");
+        logger.info("Starting broadcast discovery...");
         
         webClient.get()
                 .uri("/api/broadcast/top?page=1")
                 .retrieve()
                 .bodyToMono(TopDTO.class)
+                .retryWhen(Retry.backoff(3, Duration.ofSeconds(2))
+                        .doBeforeRetry(retrySignal -> {
+                            logger.warn("Retrying broadcast discovery (attempt {}/3)", retrySignal.totalRetries() + 1);
+                        })
+                )
                 .subscribe(
                     topDTO -> {
                         if (topDTO.active == null) return;
@@ -45,7 +52,12 @@ public class BroadcastDiscoveryWorker {
                         for(TopDTO.BroadcastDTO broadcast : topDTO.active){
                             logger.info("Processing broadcast for tournament: {}", broadcast.tour != null ? broadcast.tour.name : "unknown");
                             if (broadcast.tour == null) {
-                                logger.warn("[WARN] Skipping broadcast: missing critical data (tour, info, or dates)");
+                                logger.warn("Skipping broadcast: missing critical data (tour, info, or dates)");
+                                return;
+                            }
+
+                            if(!broadcast.round.rated){
+                                logger.warn("Skipping {} broadcast: unrated rounds", broadcast.tour.name);
                                 return;
                             }
 
@@ -99,20 +111,20 @@ public class BroadcastDiscoveryWorker {
                                 tournamentRepository.save(existingTournament);
                             }
 
-                            if(broadcast.round != null) {
+                            if(broadcast.round != null ) {
                                 saveTournamentRound(broadcast, existingTournament);
                             }
                         }
 
                     },
-                    error -> logger.error("[ERROR] Error discovering broadcasts: {}", error.getMessage(), error),
-                    () -> logger.info("[SUCCESS] Broadcast discovery completed")
+                    error -> logger.error("Error discovering broadcasts: {}", error.getMessage(), error),
+                    () -> logger.info("Broadcast discovery completed")
                 );
     }
 
     @Scheduled(fixedDelay = 600000) // Run every 10 minutes
     public void cleanupOngoingRounds() {
-        logger.info("[INFO] Starting cleanup for ONGOING rounds...");
+        logger.info("Starting cleanup for ONGOING rounds...");
         java.util.List<BroadcastRound> ongoingRounds = broadcastRoundRepository.findByStatus(Status.ONGOING);
 
         reactor.core.publisher.Flux.fromIterable(ongoingRounds)
@@ -125,6 +137,10 @@ public class BroadcastDiscoveryWorker {
                             .uri("/api/broadcast/{tourSlug}/{roundSlug}/{roundId}", tourSlug, roundSlug, round.getId())
                             .retrieve()
                             .bodyToMono(TopDTO.BroadcastDTO.class)
+                            .retryWhen(Retry.backoff(2, Duration.ofSeconds(2))
+                                    .doBeforeRetry(retrySignal -> {
+                                        logger.warn("Retrying fetch status of round (attempt {}/2)", retrySignal.totalRetries() + 1);
+                                    }))
                             .doOnNext(dto -> {
                                 if (dto.round != null) {
                                     if (dto.round.finished) {
@@ -137,7 +153,7 @@ public class BroadcastDiscoveryWorker {
                                     }
                                 }
                             })
-                            .doOnError(error -> logger.error("[ERROR] Failed to fetch round {} for cleanup: {}", round.getId(), error.getMessage()))
+                            .doOnError(error -> logger.error("Failed to fetch round {} for cleanup after retries: {}", round.getId(), error.getMessage()))
                             .onErrorResume(e -> reactor.core.publisher.Mono.empty()); // Swallow error so the loop continues
                 })
                 .blockLast();

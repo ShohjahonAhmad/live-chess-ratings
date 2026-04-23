@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.util.retry.Retry;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -37,7 +38,7 @@ public class LiveGameStreamService {
         this.gameProcessingService = gameProcessingService;
     }
 
-    @Scheduled(fixedDelay = 60000) // Changed to 1 minute to avoid rate limits
+    @Scheduled(fixedDelay = 30000) // Changed to 30 seconds to avoid rate limits
     public void refreshStreams() {
         List<BroadcastRound> rounds = broadcastRoundRepository.findByStatus(Status.ONGOING);
 
@@ -62,6 +63,11 @@ public class LiveGameStreamService {
                                     }
                                 }
                             })
+                            .retryWhen(Retry.backoff(3, java.time.Duration.ofSeconds(2))
+                                    .doBeforeRetry(retrySignal -> {
+                                        logger.warn("Retrying stream for round {} (attempt {}/3)", round.getId(), retrySignal.totalRetries() + 1);
+                                    })
+                            )
                             .doOnError(error -> {
                                 logger.error("Error in game stream for round {}: {}", round.getName(), error.getMessage());
                             })

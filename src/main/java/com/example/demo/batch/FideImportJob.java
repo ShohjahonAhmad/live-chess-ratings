@@ -5,6 +5,7 @@ import com.example.demo.entity.Rating;
 import com.example.demo.repository.PlayerRepository;
 import com.example.demo.repository.RatingRepository;
 import org.jspecify.annotations.NonNull;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.listener.ItemReadListener;
@@ -16,17 +17,23 @@ import org.springframework.batch.infrastructure.item.ItemReader;
 import org.springframework.batch.infrastructure.item.ItemWriter;
 import org.springframework.batch.infrastructure.item.xml.StaxEventItemReader;
 import org.springframework.batch.infrastructure.item.xml.builder.StaxEventItemReaderBuilder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.oxm.jaxb.Jaxb2Marshaller;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import java.net.MalformedURLException;
 import java.time.LocalDate;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Configuration
 public class FideImportJob {
+
+    private static final Logger logger = LoggerFactory.getLogger(FideImportJob.class);
 
     @Bean
     public Job importPlayersJob(JobRepository jobRepository, Step importPlayersStep){
@@ -53,20 +60,27 @@ public class FideImportJob {
                 .listener(new ItemReadListener<Player>() {
                     @Override
                     public void onReadError(@NonNull Exception ex) {
-                        System.out.println("Error reading player: " + ex.getMessage());
+                        logger.error("Error reading player: {}", ex.getMessage());
                     }
                 })
                 .build();
     }
 
     @Bean
-    StaxEventItemReader<Player> reader(){
-        return new StaxEventItemReaderBuilder<Player>()
-                .name("playerReader")
-                .resource(new FileSystemResource("F:/players.xml"))
-                .addFragmentRootElements("player")
-                .unmarshaller(playerMarshaller())
-                .build();
+    @StepScope
+    StaxEventItemReader<Player> reader(@Value("#{jobParameters['fileUrl']}") String fileUrl) {
+        if(fileUrl == null) throw new IllegalArgumentException("fileUrl parameter is required");
+        try {
+            UrlResource urlResource = new UrlResource(fileUrl);
+            return new StaxEventItemReaderBuilder<Player>()
+                    .name("playerReader")
+                    .resource(urlResource)
+                    .addFragmentRootElements("player")
+                    .unmarshaller(playerMarshaller())
+                    .build();
+        } catch (MalformedURLException e) {
+            throw new IllegalArgumentException("Invalid file url: " + fileUrl, e);
+        }
     }
 
     @Bean
@@ -85,17 +99,25 @@ public class FideImportJob {
     }
 
     @Bean
-    ItemWriter<Player> writer(PlayerRepository playerRepository, RatingRepository ratingRepository) {
+    @StepScope
+    ItemWriter<Player> writer(@Value("#{jobParameters['importDate']}") String importDate, PlayerRepository playerRepository, RatingRepository ratingRepository) {
+        if(importDate == null || importDate.isEmpty()) throw new IllegalArgumentException("importDate parameter is required");
+        LocalDate period = LocalDate.now();
+        try {
+            period = LocalDate.parse(importDate);
+        } catch (Exception e) {
+            logger.warn("Invalid importDate format, using current date as period: {}", e.getMessage());
+        }
+        LocalDate finalPeriod = period.withDayOfMonth(1);
+
         return players -> {
             playerRepository.saveAll(players);
-
-            LocalDate period = LocalDate.now().withDayOfMonth(1);
 
             List<Rating> ratings = players.getItems().stream()
                     .map(player -> {
                         Rating rating = new Rating();
                         rating.setPlayer(player);
-                        rating.setPeriod(period);
+                        rating.setPeriod(finalPeriod);
                         rating.setStdRating(player.getStdRating());
                         rating.setRapidRating(player.getRapidRating());
                         rating.setBlitzRating(player.getBlitzRating());
