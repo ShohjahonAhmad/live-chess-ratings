@@ -34,6 +34,9 @@ public class EloCalculatorTest {
 
         double result2 = eloCalculator.calculateExpectedScore(2400, 2200);
         assertThat(result2).isEqualTo(0.76);
+
+        double result3 = eloCalculator.calculateExpectedScore(2662, 2687);
+        assertThat(result3).isEqualTo(0.47);
     }
 
     @Test
