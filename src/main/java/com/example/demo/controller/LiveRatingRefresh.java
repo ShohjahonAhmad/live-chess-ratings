@@ -19,7 +19,7 @@ public class LiveRatingRefresh {
     }
 
     @PostMapping("/refresh-live-ratings")
-    public ResponseEntity<MonthlyRatingsResponseDTO> refreshLiveRatings(@RequestParam String importDate) {
+    public ResponseEntity<MonthlyRatingsResponseDTO> refreshLiveRatings(@RequestParam(required = false) String importDate) {
         try {
             LocalDate period = LocalDate.now();
             try {

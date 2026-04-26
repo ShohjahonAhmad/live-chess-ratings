@@ -84,4 +84,5 @@ public class MonthlyRatingsTest {
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
     }
+
 }
