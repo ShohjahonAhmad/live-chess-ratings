@@ -25,14 +25,14 @@ public class EloCalculator {
             d = 400;
         }
 
-        double pd = 0.50;
+        int pd = 50;
         int i = 0;
         while (i < FIDE_D_TABLE.length && d > FIDE_D_TABLE[i]) {
-            pd += 0.01;
+            pd++;
             i++;
         }
 
-        return aIsHigher ? pd : 1.0 - pd;
+        return aIsHigher ? (double) pd / 100 : (double) (100 - pd) / 100;
     }
 
     /**
@@ -53,6 +53,7 @@ public class EloCalculator {
      * @return time control type
      */
     public TimeControl findTimeControlType(double time) {
+        time = Math.abs(time);
         if(time <= 10.0) return TimeControl.BLITZ;
         else if( time < 45.0) return TimeControl.RAPID;
         return TimeControl.STD;
