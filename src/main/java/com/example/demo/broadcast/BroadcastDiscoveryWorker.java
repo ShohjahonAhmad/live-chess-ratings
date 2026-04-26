@@ -51,7 +51,7 @@ public class BroadcastDiscoveryWorker {
 
                         for(TopDTO.BroadcastDTO broadcast : topDTO.active){
                             logger.info("Processing broadcast for tournament: {}", broadcast.tour != null ? broadcast.tour.name : "unknown");
-                            if (broadcast.tour == null) {
+                            if (broadcast.tour == null || broadcast.tour.info.location.equals("Chess.com")) {
                                 logger.warn("Skipping broadcast: missing critical data (tour, info, or dates)");
                                 return;
                             }

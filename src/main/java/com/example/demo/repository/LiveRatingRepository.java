@@ -6,5 +6,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
+    LiveRating findByPlayerFideId(Long fideId);
 }
 

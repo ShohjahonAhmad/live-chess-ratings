@@ -30,12 +30,12 @@ public class LiveRating {
 
     // Tracks the total change since the last official FIDE period
     @Column(name = "std_change")
-    private Double stdChange;
+    private Double stdChange = 0.0;
 
     @Column(name = "rapid_change")
-    private Double rapidChange;
+    private Double rapidChange = 0.0;
 
     @Column(name = "blitz_change")
-    private Double blitzChange;
+    private Double blitzChange = 0.0;
 }
 

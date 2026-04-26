@@ -1,16 +1,13 @@
 package com.example.demo.service;
 
-import com.example.demo.batch.FideImportJob;
 import com.example.demo.dto.MonthlyRatingsResponseDTO;
-import com.example.demo.repository.RatingRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.parameters.JobParameters;
 import org.springframework.batch.core.job.parameters.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDate;
 
 @Service
 public class MonthlyRatingsService {
@@ -23,6 +20,7 @@ public class MonthlyRatingsService {
         this.jobOperator = jobOperator;
     }
 
+    @Transactional
     public MonthlyRatingsResponseDTO importMonthlyRatings(String fileUrl, String importDate) {
         try {
             JobParameters jobParams = new JobParametersBuilder()

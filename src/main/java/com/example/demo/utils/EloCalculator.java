@@ -52,13 +52,9 @@ public class EloCalculator {
      * @param time total time given in the beginning of the game
      * @return time control type
      */
-    public String findTimeControlType(double time) {
-        if(time <= 10.0) {
-            return "blitz";
-        } else if( time < 45.0){
-            return "rapid";
-        } else {
-            return "std";
-        }
+    public TimeControl findTimeControlType(double time) {
+        if(time <= 10.0) return TimeControl.BLITZ;
+        else if( time < 45.0) return TimeControl.RAPID;
+        return TimeControl.STD;
     }
 }

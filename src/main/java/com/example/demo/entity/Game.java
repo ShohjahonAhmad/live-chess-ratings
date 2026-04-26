@@ -1,6 +1,7 @@
 package com.example.demo.entity;
 
 import com.example.demo.utils.Result;
+import com.example.demo.utils.TimeControl;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -41,6 +42,10 @@ public class Game {
 
     @Enumerated(EnumType.STRING)
     private Result result;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "time_control", columnDefinition = "varchar(10) default 'STD'")
+    private TimeControl timeControl = TimeControl.STD;
 
     private LocalDate date;
 }

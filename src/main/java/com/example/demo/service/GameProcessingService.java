@@ -6,6 +6,7 @@ import com.example.demo.repository.LiveRatingRepository;
 import com.example.demo.repository.PlayerRepository;
 import com.example.demo.utils.EloCalculator;
 import com.example.demo.utils.Result;
+import com.example.demo.utils.TimeControl;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,10 +91,10 @@ public class GameProcessingService {
 
         EloCalculator eloCalculator = new EloCalculator();
 
-        String tcType = "std";
+        TimeControl tcType = TimeControl.STD;
         if (timeControl != null) {
             try {
-                double timeValue = getFirstNumberFromString(timeControl);
+                double timeValue = getFirstNumberFromString(timeControl.trim());
                 tcType = eloCalculator.findTimeControlType(timeValue);
             } catch (Exception e) {
                 // Ignore parse errors safely
@@ -106,7 +107,7 @@ public class GameProcessingService {
                     tcType = eloCalculator.findTimeControlType(timeValue);
                 } catch (Exception e) {
                     // fallback to std if parsing fails
-                    tcType = "std";
+                    tcType = TimeControl.STD;
                 }
             }
         }
@@ -114,9 +115,9 @@ public class GameProcessingService {
         if(whitePlayer != null && tcType != null) {
             int k = 0;
             switch (tcType) {
-                case "blitz" -> k = whitePlayer.getBlitzK() != null ? whitePlayer.getBlitzK() : 20;
-                case "rapid" -> k = whitePlayer.getRapidK() != null ? whitePlayer.getRapidK() : 20;
-                case "std"   -> k = whitePlayer.getStdK() != null ? whitePlayer.getStdK() : 20;
+                case TimeControl.BLITZ -> k = whitePlayer.getBlitzK() != null ? whitePlayer.getBlitzK() : 20;
+                case TimeControl.RAPID -> k = whitePlayer.getRapidK() != null ? whitePlayer.getRapidK() : 20;
+                case TimeControl.STD   -> k = whitePlayer.getStdK() != null ? whitePlayer.getStdK() : 20;
             }
 
             double actualScore = resultEnum == Result.WIN ? 1.0 : (resultEnum == Result.LOSS ? 0.0 : 0.5);
@@ -126,15 +127,15 @@ public class GameProcessingService {
             LiveRating liveRating = liveRatingRepository.findById(whitePlayer.getFideId()).orElse(null);
             if (liveRating != null) {
                 switch (tcType) {
-                    case "blitz" -> {
+                    case TimeControl.BLITZ -> {
                         liveRating.setBlitzRating(addAndRound(liveRating.getBlitzRating(), game.getWhiteRatingChange()));
                         liveRating.setBlitzChange(addAndRound(liveRating.getBlitzChange(), game.getWhiteRatingChange()));
                     }
-                    case "rapid" -> {
+                    case TimeControl.RAPID -> {
                         liveRating.setRapidRating(addAndRound(liveRating.getRapidRating(), game.getWhiteRatingChange()));
                         liveRating.setRapidChange(addAndRound(liveRating.getRapidChange(), game.getWhiteRatingChange()));
                     }
-                    case "std"   -> {
+                    case TimeControl.STD   -> {
                         liveRating.setStdRating(addAndRound(liveRating.getStdRating(), game.getWhiteRatingChange()));
                         liveRating.setStdChange(addAndRound(liveRating.getStdChange(), game.getWhiteRatingChange()));
                     }
@@ -146,9 +147,9 @@ public class GameProcessingService {
         if(blackPlayer != null && tcType != null) {
             int k = 0;
             switch (tcType) {
-                case "blitz" -> k = blackPlayer.getBlitzK() != null ? blackPlayer.getBlitzK() : 20;
-                case "rapid" -> k = blackPlayer.getRapidK() != null ? blackPlayer.getRapidK() : 20;
-                case "std"   -> k = blackPlayer.getStdK() != null ? blackPlayer.getStdK() : 20;
+                case TimeControl.BLITZ -> k = blackPlayer.getBlitzK() != null ? blackPlayer.getBlitzK() : 20;
+                case TimeControl.RAPID -> k = blackPlayer.getRapidK() != null ? blackPlayer.getRapidK() : 20;
+                case TimeControl.STD   -> k = blackPlayer.getStdK() != null ? blackPlayer.getStdK() : 20;
             }
 
             double actualScore = resultEnum == Result.LOSS ? 1.0 : (resultEnum == Result.WIN ? 0.0 : 0.5);
@@ -158,15 +159,15 @@ public class GameProcessingService {
             LiveRating liveRating = liveRatingRepository.findById(blackPlayer.getFideId()).orElse(null);
             if (liveRating != null) {
                 switch (tcType) {
-                    case "blitz" -> {
+                    case TimeControl.BLITZ -> {
                         liveRating.setBlitzRating(addAndRound(liveRating.getBlitzRating(), game.getBlackRatingChange()));
                         liveRating.setBlitzChange(addAndRound(liveRating.getBlitzChange(), game.getBlackRatingChange()));
                     }
-                    case "rapid" -> {
+                    case TimeControl.RAPID -> {
                         liveRating.setRapidRating(addAndRound(liveRating.getRapidRating(), game.getBlackRatingChange()));
                         liveRating.setRapidChange(addAndRound(liveRating.getRapidChange(), game.getBlackRatingChange()));
                     }
-                    case "std"   -> {
+                    case TimeControl.STD  -> {
                         liveRating.setStdRating(addAndRound(liveRating.getStdRating(), game.getBlackRatingChange()));
                         liveRating.setStdChange(addAndRound(liveRating.getStdChange(), game.getBlackRatingChange()));
                     }
@@ -174,7 +175,7 @@ public class GameProcessingService {
                 liveRatingRepository.save(liveRating);
             }
         }
-
+        game.setTimeControl(tcType);
         gameRepository.save(game);
         logger.debug("Game {} saved: {} vs {} - Result: {}", gameId, whiteFideId, blackFideId, result);
     }
@@ -187,15 +188,20 @@ public class GameProcessingService {
 
     private double getFirstNumberFromString(String timeControl) {
         double result = 0;
+        boolean isAllNumeric = true;
 
         for(int i = 0; i < timeControl.length(); i++) {
             char c = timeControl.charAt(i);
 
-            if(!Character.isDigit(c)) break;
+            if(!Character.isDigit(c)) {
+                isAllNumeric = false;
+                break;
+            }
 
             result = result * 10 + Integer.parseInt(String.valueOf(c));
         }
 
+        if(isAllNumeric) return result / 60.0;
         return result;
     }
 
