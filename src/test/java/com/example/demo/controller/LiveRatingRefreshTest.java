@@ -58,4 +58,6 @@ public class LiveRatingRefreshTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Live ratings refreshed successfully for period: " + java.time.LocalDate.now().withDayOfMonth(1)));
     }
+
+    //
 }
