@@ -3,6 +3,7 @@ package com.example.demo.controller;
 import com.example.demo.dto.MonthlyRatingsRequestDTO;
 import com.example.demo.dto.MonthlyRatingsResponseDTO;
 import com.example.demo.service.MonthlyRatingsService;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +21,7 @@ public class MonthlyRatingsController {
     }
 
     @PostMapping("/monthly-ratings")
-    public ResponseEntity<MonthlyRatingsResponseDTO> postMonthlyRatings(@RequestBody MonthlyRatingsRequestDTO requestDTO) {
+    public ResponseEntity<MonthlyRatingsResponseDTO> postMonthlyRatings(@Valid @RequestBody MonthlyRatingsRequestDTO requestDTO) {
        try {
            MonthlyRatingsResponseDTO responseDTO = monthlyRatingsService.importMonthlyRatings(requestDTO.getLinkToFile(), requestDTO.getDate());
            logger.debug("Import monthly ratings response: success={}, message={}", responseDTO.isSuccess(), responseDTO.getMessage());
