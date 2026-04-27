@@ -20,6 +20,7 @@ public class TopDTO {
 
         public TournamentDTO tour;
         public RoundDTO round;
+        public Object group;
 
 
         public static class RoundDTO {
