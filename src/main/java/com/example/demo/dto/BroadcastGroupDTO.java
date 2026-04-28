@@ -1,7 +1,6 @@
 package com.example.demo.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -18,7 +17,7 @@ public class BroadcastGroupDTO {
     }
     public List<RoundDTO> rounds;
     public TournamentDTO tour;
-    public static class TournamentDTO{
+    public static class TournamentDTO {
         public static class BroadcastInfoDTO {
             public String format;
             public String tc;
