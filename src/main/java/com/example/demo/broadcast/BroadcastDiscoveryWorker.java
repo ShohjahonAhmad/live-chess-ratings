@@ -1,8 +1,7 @@
 package com.example.demo.broadcast;
 
-import com.example.demo.dto.BroadcastGroupDTO;
-import com.example.demo.dto.TopDTO;
-import com.example.demo.dto.TopGroupDTO;
+import com.example.demo.dto.BroadcastDTO;
+import com.example.demo.dto.BroadcastRoundDTO;
 import com.example.demo.entity.BroadcastRound;
 import com.example.demo.entity.Tournament;
 import com.example.demo.repository.BroadcastRoundRepository;
@@ -22,7 +21,7 @@ import java.time.Instant;
 
 @Component
 public class BroadcastDiscoveryWorker {
-
+    final private static byte MAX_BROADCASTS = 100; //Default => 20, Max => 100
     private static final Logger logger = LoggerFactory.getLogger(BroadcastDiscoveryWorker.class);
 
     final private WebClient webClient;
@@ -40,39 +39,27 @@ public class BroadcastDiscoveryWorker {
         logger.info("Starting broadcast discovery...");
         
         webClient.get()
-                .uri("/api/broadcast/top?page=1")
+                .uri("/api/broadcast?nb=100&live=true")
                 .retrieve()
-                .bodyToMono(TopDTO.class)
+                .bodyToFlux(BroadcastDTO.class)
                 .retryWhen(Retry.backoff(3, Duration.ofSeconds(2))
                         .doBeforeRetry(retrySignal -> {
                             logger.warn("Retrying broadcast discovery (attempt {}/3)", retrySignal.totalRetries() + 1);
                         })
                 )
                 .subscribe(
-                    topDTO -> {
-                        if (topDTO.active == null) return;
-
-                        for(TopDTO.BroadcastDTO broadcast : topDTO.active){
-                            processBroadcast(broadcast);
-                        }
-                    },
+                        this::processBroadcast,
                     error -> logger.error("Error discovering broadcasts: {}", error.getMessage(), error),
                     () -> logger.info("Broadcast discovery completed")
                 );
     }
 
-    private void processBroadcast(TopDTO.BroadcastDTO broadcastDTO) {
+    private void processBroadcast(BroadcastDTO broadcastDTO) {
         logger.info("Processing broadcast for tournament: {}", broadcastDTO.tour != null && broadcastDTO.tour.id != null ? broadcastDTO.tour.id : "unknown");
 
-        // Skip broadcast if critical fields are missing
-        if (broadcastDTO.tour == null) {
-            logger.warn("Skipping broadcast: missing critical data (tour, info, or dates)");
-            return;
-        }
-
-        // Skip unrated tournaments
-        if(!broadcastDTO.round.rated || broadcastDTO.tour.info.location.equals("Chess.com")){
-            logger.warn("Skipping {} broadcastDTO: unrated rounds", broadcastDTO.tour.name);
+        try {
+            validateBroadcast(broadcastDTO);
+        } catch (IllegalArgumentException e){
             return;
         }
 
@@ -83,12 +70,26 @@ public class BroadcastDiscoveryWorker {
             saveUpdatedTournament(existingTournament, tournament);
         }
 
-        if(broadcastDTO.round != null) {
-            saveTournamentRound(broadcastDTO, existingTournament);
+        for(BroadcastDTO.RoundDTO roundDTO : broadcastDTO.rounds) {
+            saveTournamentRound(roundDTO, existingTournament);
         }
     }
 
-    private Tournament convertTourDTOTournament(TopDTO.BroadcastDTO broadcast) {
+    private void validateBroadcast(BroadcastDTO broadcastDTO) {
+        // Skip broadcast if critical fields are missing
+        if (broadcastDTO.tour == null) {
+            logger.warn("Skipping broadcast: missing critical data (tour, info, or dates)");
+            throw new IllegalArgumentException();
+        }
+
+        // Skip unrated tournaments
+        if(!broadcastDTO.rounds.getFirst().rated || broadcastDTO.tour.info.location.contains(".com")){
+            logger.warn("Skipping {} broadcastDTO: unrated rounds", broadcastDTO.tour.name);
+            throw new IllegalArgumentException();
+        }
+    }
+
+    private Tournament convertTourDTOTournament(BroadcastDTO broadcast) {
         Tournament tournament = new Tournament();
         if(broadcast.tour.id != null){
             tournament.setId(broadcast.tour.id);
@@ -121,10 +122,6 @@ public class BroadcastDiscoveryWorker {
             }
         }
 
-        if(broadcast.group != null && broadcast.round.ongoing) {
-            findSiblingTournaments(broadcast.tour.id);
-        }
-
         return tournament;
     }
 
@@ -145,19 +142,26 @@ public class BroadcastDiscoveryWorker {
         tournamentRepository.save(existingTournament);
     }
 
-    private void saveTournamentRound(TopDTO.BroadcastDTO broadcast, Tournament tournament) {
-        TopDTO.BroadcastDTO.RoundDTO roundDTO = broadcast.round;
-        logger.info("Processing round {}: {} (ongoing)", roundDTO.id != null ? roundDTO.id : "unknown", roundDTO.ongoing);
-
+    private void validateTournamentRound(BroadcastDTO.RoundDTO roundDTO) {
         // Skip round if critical fields are missing
         if (roundDTO.id == null || roundDTO.name == null) {
             logger.warn("Skipping round: missing id or name");
-            return;
+            throw new IllegalArgumentException();
         }
 
         //Skip unrated round
         if(!roundDTO.rated) {
             logger.warn("Skipping round {}: not rated", roundDTO.id);
+            throw new IllegalArgumentException();
+        }
+    }
+
+    private void saveTournamentRound(BroadcastDTO.RoundDTO roundDTO, Tournament tournament) {
+        logger.info("Processing round {}: {} (ongoing)", roundDTO.id != null ? roundDTO.id : "unknown", roundDTO.ongoing);
+
+        try {
+            validateTournamentRound(roundDTO);
+        } catch (IllegalArgumentException e){
             return;
         }
 
@@ -170,7 +174,7 @@ public class BroadcastDiscoveryWorker {
         }
     }
 
-    public BroadcastRound convertBroadcastRoundDTOBroadcastRound(TopDTO.BroadcastDTO.RoundDTO roundDTO) {
+    public BroadcastRound convertBroadcastRoundDTOBroadcastRound(BroadcastDTO.RoundDTO roundDTO) {
         BroadcastRound round = new BroadcastRound();
 
         round.setId(roundDTO.id);
@@ -183,7 +187,7 @@ public class BroadcastDiscoveryWorker {
         // Deciding game status
         if(roundDTO.finished) round.setStatus(Status.FINISHED);
         else if(roundDTO.ongoing) round.setStatus(Status.ONGOING);
-        else if (roundDTO.startsAt < Instant.now().toEpochMilli()) round.setStatus(Status.ONGOING);
+        else if (roundDTO.startsAt != null && roundDTO.startsAt < Instant.now().toEpochMilli()) round.setStatus(Status.ONGOING);
         else round.setStatus(Status.UNSTARTED);
 
         if(roundDTO.startsAt != null) {
@@ -219,160 +223,6 @@ public class BroadcastDiscoveryWorker {
     }
     /// Discover Broadcast (end)
 
-    public void findSiblingTournaments(String id) {
-        logger.info("Finding sibling tournaments for tournament ID: {}", id);
-
-        webClient.get()
-                .uri("/api/broadcast/{id}", id)
-                .retrieve()
-                .bodyToMono(TopGroupDTO.class)
-                .subscribe(
-                        topGroupDTO -> {
-                            logger.debug("Received sibling tournament data for ID {}", id);
-                            processSiblingTournaments(topGroupDTO.group, id);
-                        },
-                        error -> logger.error("Error fetching sibling tournaments for ID {}: {}", id, error.getMessage(), error),
-                        () -> logger.info("Sibling tournament fetch completed for ID {}", id)
-                );
-    }
-
-    public void processSiblingTournaments(TopGroupDTO.GroupDTO group, String tournamentId) {
-        //Skip if group doesn't exist
-        if(group == null || group.tours == null){
-            logger.warn("No group date found for tournament: {}", tournamentId);
-            return;
-        }
-
-        reactor.core.publisher.Flux.fromIterable(group.tours)
-                .concatMap(tour ->
-                    reactor.core.publisher.Mono.fromRunnable(() -> fetchTournament(tour.id))
-                            .delaySubscription(Duration.ofMillis(500)) // 0.5 s between each request
-                )
-                .subscribe();
-    }
-
-    public void fetchTournament(String tournamentId) {
-        logger.debug("Processing sibling tournament with ID: {}", tournamentId);
-
-        webClient.get()
-                .uri("/api/broadcast/{id}", tournamentId)
-                .retrieve()
-                .bodyToMono(BroadcastGroupDTO.class)
-                .subscribe(
-                        this::processSiblingTournament,
-                        error -> logger.error("Error processing sibling tournament ID {}: {}", tournamentId, error.getMessage(), error),
-                        () -> logger.info("Sibling tournament processing completed for ID {}", tournamentId)
-                );
-
-    }
-
-    public void processSiblingTournament(BroadcastGroupDTO broadcast) {
-        logger.info("Processing sibling broadcast for tournament: {}", (broadcast.tour != null && broadcast.tour.id != null) ? broadcast.tour.id : "unknown");
-
-        //Skip sibling tournament if critical fields are missing
-        if (broadcast.tour == null || broadcast.tour.info.location.equals("Chess.com")) {
-            logger.warn("Skipping sibling broadcast: missing critical data (tour, info, or dates)");
-            return;
-        }
-
-        Tournament tournament = convertTourDTOTournament(broadcast);
-
-        Tournament existingTournament = tournamentRepository.findById(tournament.getId()).orElse(new Tournament());
-        if(!tournament.equals(existingTournament)) {
-            saveUpdatedTournament(existingTournament, tournament);
-        }
-
-        for(BroadcastGroupDTO.RoundDTO round : broadcast.rounds){
-            saveTournamentRound(round, existingTournament);
-        }
-    }
-
-    private Tournament convertTourDTOTournament(BroadcastGroupDTO broadcast) {
-        Tournament tournament = new Tournament();
-        if(broadcast.tour.id != null){
-            tournament.setId(broadcast.tour.id);
-        }
-        if(broadcast.tour.name != null){
-            tournament.setName(broadcast.tour.name);
-        }
-        if(broadcast.tour.slug != null){
-            tournament.setSlug(broadcast.tour.slug);
-        }
-        if(broadcast.tour.description != null){
-            tournament.setDescription(broadcast.tour.description);
-        }
-        if(broadcast.tour.dates != null && broadcast.tour.dates.length > 0) {
-            tournament.setStartsAt(Instant.ofEpochMilli(broadcast.tour.dates[0]));
-        }
-        if(broadcast.tour.dates != null && broadcast.tour.dates.length > 1) {
-            tournament.setEndsAt(Instant.ofEpochMilli(broadcast.tour.dates[1]));
-        }
-
-        if(broadcast.tour.info != null) {
-            if(broadcast.tour.info.tc != null){
-                tournament.setTc(broadcast.tour.info.tc);
-            }
-            if(broadcast.tour.info.format != null){
-                tournament.setFormat(broadcast.tour.info.format);
-            }
-            if(broadcast.tour.info.location != null){
-                tournament.setLocation(broadcast.tour.info.location);
-            }
-        }
-
-        return tournament;
-    }
-
-    private void saveTournamentRound(BroadcastGroupDTO.RoundDTO roundDTO, Tournament tournament) {
-        logger.info("Processing sibling round {}: {} (ongoing)", roundDTO.id != null ? roundDTO.id : "unknown", roundDTO.ongoing);
-
-        // Skip round if critical fields are missing
-        if (roundDTO.id == null || roundDTO.name == null) {
-            logger.warn("Skipping sibling round: missing id or name");
-            return;
-        }
-
-        //Skip unrated round
-        if(!roundDTO.rated) {
-            logger.warn("Skipping sibling round {}: not rated", roundDTO.id);
-            return;
-        }
-
-        BroadcastRound round = convertBroadcastRoundDTOBroadcastRound(roundDTO);
-        round.setTournament(tournament);
-
-        BroadcastRound existing = broadcastRoundRepository.findById(round.getId()).orElse(new BroadcastRound());
-        if(!round.equals(existing)){
-            saveUpdatedBroadcastRound(existing, round, tournament);
-        }
-    }
-
-    public BroadcastRound convertBroadcastRoundDTOBroadcastRound(BroadcastGroupDTO.RoundDTO roundDTO) {
-        BroadcastRound round = new BroadcastRound();
-
-        round.setId(roundDTO.id);
-        round.setName(roundDTO.name);
-
-        if(roundDTO.slug != null){
-            round.setSlug(roundDTO.slug);
-        }
-
-        // Deciding game status
-        if(roundDTO.finished) round.setStatus(Status.FINISHED);
-        else if(roundDTO.ongoing) round.setStatus(Status.ONGOING);
-        else if (roundDTO.startsAt < Instant.now().toEpochMilli()) round.setStatus(Status.ONGOING);
-        else round.setStatus(Status.UNSTARTED);
-
-        if(roundDTO.startsAt != null) {
-            round.setStartsAt(Instant.ofEpochMilli(roundDTO.startsAt));
-        }
-
-        if(roundDTO.finishedAt != null){
-            round.setEndsAt(Instant.ofEpochMilli(roundDTO.finishedAt));
-        }
-
-        return round;
-    }
 
     @Scheduled(fixedDelay = 600000) // Run every 10 minutes
     public void cleanupOngoingRounds() {
@@ -389,7 +239,7 @@ public class BroadcastDiscoveryWorker {
                             .uri("/api/broadcast/{tourSlug}/{roundSlug}/{roundId}", tourSlug, roundSlug, round.getId())
                             .header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
                             .retrieve()
-                            .bodyToMono(TopDTO.BroadcastDTO.class)
+                            .bodyToMono(BroadcastRoundDTO.class)
                             .retryWhen(Retry.backoff(2, Duration.ofSeconds(2))
                                     .doBeforeRetry(retrySignal -> {
                                         logger.warn("Retrying fetch status of round (attempt {}/2)", retrySignal.totalRetries() + 1);
