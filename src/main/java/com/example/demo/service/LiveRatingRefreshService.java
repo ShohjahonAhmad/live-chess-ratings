@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.List;
 
+import static com.example.demo.service.GameProcessingService.addAndRound;
+
 @Service
 public class LiveRatingRefreshService {
     private static final Logger logger = LoggerFactory.getLogger(LiveRatingRefreshService.class);
@@ -22,6 +24,7 @@ public class LiveRatingRefreshService {
     private final LiveRatingRepository liveRatingRepository;
     private final RatingRepository ratingRepository;
     private final GameRepository gameRepository;
+    private int anInt;
 
     public LiveRatingRefreshService(LiveRatingRepository liveRatingRepository, RatingRepository ratingRepository, GameRepository gameRepository) {
         this.liveRatingRepository = liveRatingRepository;
@@ -30,23 +33,23 @@ public class LiveRatingRefreshService {
     }
 
     @Transactional
-public void refreshLiveRatings(LocalDate period) {
-            logger.info("Starting live ratings refresh for period: {}", period);
-            liveRatingRepository.deleteAll();
+    public void refreshLiveRatings(LocalDate period) {
+        logger.info("Starting live ratings refresh for period: {}", period);
+        liveRatingRepository.deleteAll();
 
-            List<Rating> monthlyRatings = ratingRepository.findByPeriod(period);
+        List<Rating> monthlyRatings = ratingRepository.findByPeriod(period);
 
-            for(Rating rating : monthlyRatings) {
-                LiveRating liveRating = new LiveRating();
-                liveRating.setPlayer(rating.getPlayer());
-                liveRating.setStdRating(rating.getStdRating() != null ? (double) rating.getStdRating() : 0.0);
-                liveRating.setRapidRating(rating.getRapidRating() != null ? (double) rating.getRapidRating() : 0.0);
-                liveRating.setBlitzRating(rating.getBlitzRating() != null ? (double) rating.getBlitzRating() : 0.0);
-                liveRatingRepository.save(liveRating);
-            }
+        for(Rating rating: monthlyRatings) {
+            LiveRating liveRating = new LiveRating();
+            liveRating.setPlayer(rating.getPlayer());
+            liveRating.setStdRating(rating.getStdRating() != null ? (double) rating.getStdRating() : 0.0);
+            liveRating.setRapidRating(rating.getRapidRating() != null ? (double) rating.getRapidRating() : 0.0);
+            liveRating.setBlitzRating(rating.getBlitzRating() != null ? (double) rating.getBlitzRating() : 0.0);
+            liveRatingRepository.save(liveRating);
+        }
 
-            recalculateFromGames();
-            logger.info("Live ratings refresh completed successfully for period: {}", period);
+        recalculateFromGames();
+        logger.info("Live ratings refresh completed successfully for period: {}", period);
     }
 
     private void recalculateFromGames() {
@@ -60,37 +63,37 @@ public void refreshLiveRatings(LocalDate period) {
             if(whiteLiveRating == null && blackLiveRating == null) continue;
 
             if(whiteLiveRating != null && game.getWhiteRatingChange() != null) {
-                switch (game.getTimeControl()){
+                switch (game.getTimeControl()) {
                     case TimeControl.STD -> {
-                        whiteLiveRating.setStdRating(whiteLiveRating.getStdRating() + game.getWhiteRatingChange());
-                        whiteLiveRating.setStdChange(whiteLiveRating.getStdChange() + game.getWhiteRatingChange());
+                        whiteLiveRating.setStdRating(addAndRound(whiteLiveRating.getStdRating(), game.getWhiteRatingChange()));
+                        whiteLiveRating.setStdChange(addAndRound(whiteLiveRating.getStdChange(), game.getWhiteRatingChange()));
                     }
                     case TimeControl.RAPID -> {
-                        whiteLiveRating.setRapidRating(whiteLiveRating.getRapidRating() + game.getWhiteRatingChange());
-                        whiteLiveRating.setRapidChange(whiteLiveRating.getRapidChange() + game.getWhiteRatingChange());
+                        whiteLiveRating.setRapidRating(addAndRound(whiteLiveRating.getRapidRating(), game.getWhiteRatingChange()));
+                        whiteLiveRating.setRapidChange(addAndRound(whiteLiveRating.getRapidChange(), game.getWhiteRatingChange()));
                     }
                     case TimeControl.BLITZ -> {
-                        whiteLiveRating.setBlitzRating(whiteLiveRating.getBlitzRating() + game.getWhiteRatingChange());
-                        whiteLiveRating.setBlitzChange(whiteLiveRating.getBlitzChange() + game.getWhiteRatingChange() );
+                        whiteLiveRating.setBlitzRating(addAndRound(whiteLiveRating.getBlitzRating(), game.getWhiteRatingChange()));
+                        whiteLiveRating.setBlitzChange(addAndRound(whiteLiveRating.getBlitzChange(), game.getWhiteRatingChange()));
                     }
                 }
 
                 liveRatingRepository.save(whiteLiveRating);
             }
 
-            if(blackLiveRating != null && game.getBlackRatingChange() != null) {
-                switch (game.getTimeControl()){
-                    case TimeControl.STD -> {
-                        blackLiveRating.setStdRating(blackLiveRating.getStdRating() + game.getBlackRatingChange());
-                        blackLiveRating.setStdChange(blackLiveRating.getStdChange() + game.getBlackRatingChange());
-                    }
+             if(blackLiveRating != null && game.getBlackRatingChange() != null) {
+                 switch (game.getTimeControl()){
+                     case TimeControl.STD -> {
+                         blackLiveRating.setStdRating(addAndRound(blackLiveRating.getStdRating(), game.getBlackRatingChange()));
+                         blackLiveRating.setStdChange(addAndRound(blackLiveRating.getStdChange(), game.getBlackRatingChange()));
+                     }
                     case TimeControl.RAPID -> {
-                        blackLiveRating.setRapidRating(blackLiveRating.getRapidRating() + game.getBlackRatingChange());
-                        blackLiveRating.setRapidChange(blackLiveRating.getRapidChange() + game.getBlackRatingChange());
+                        blackLiveRating.setRapidRating(addAndRound(blackLiveRating.getRapidRating(), game.getBlackRatingChange()));
+                        blackLiveRating.setRapidChange(addAndRound(blackLiveRating.getRapidChange(), game.getBlackRatingChange()));
                     }
                     case TimeControl.BLITZ -> {
-                        blackLiveRating.setBlitzRating(blackLiveRating.getBlitzRating() + game.getBlackRatingChange());
-                        blackLiveRating.setBlitzChange(blackLiveRating.getBlitzChange() + game.getBlackRatingChange());
+                        blackLiveRating.setBlitzRating(addAndRound(blackLiveRating.getBlitzRating(), game.getBlackRatingChange()));
+                        blackLiveRating.setBlitzChange(addAndRound(blackLiveRating.getBlitzChange(), game.getBlackRatingChange()));
                     }
                 }
 

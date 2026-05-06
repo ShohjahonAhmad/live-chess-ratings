@@ -6,7 +6,9 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 @Data
@@ -48,4 +50,8 @@ public class Game {
     private TimeControl timeControl = TimeControl.STD;
 
     private LocalDate date;
+
+    @CreationTimestamp
+    @Column(name = "created_at", insertable = false, updatable = false )
+    private Instant createdAt;
 }

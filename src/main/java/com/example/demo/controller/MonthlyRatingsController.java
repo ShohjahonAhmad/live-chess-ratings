@@ -14,25 +14,24 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class MonthlyRatingsController {
     private final MonthlyRatingsService monthlyRatingsService;
-    private static final Logger logger = LoggerFactory.getLogger(MonthlyRatingsController.class);
+    private static final Logger logger = LoggerFactory.getLogger (MonthlyRatingsController.class);
 
     public MonthlyRatingsController(MonthlyRatingsService monthlyRatingsService) {
         this.monthlyRatingsService = monthlyRatingsService;
     }
-
     @PostMapping("/monthly-ratings")
     public ResponseEntity<MonthlyRatingsResponseDTO> postMonthlyRatings(@Valid @RequestBody MonthlyRatingsRequestDTO requestDTO) {
-       try {
-           MonthlyRatingsResponseDTO responseDTO = monthlyRatingsService.importMonthlyRatings(requestDTO.getLinkToFile(), requestDTO.getDate());
-           logger.debug("Import monthly ratings response: success={}, message={}", responseDTO.isSuccess(), responseDTO.getMessage());
-           if(responseDTO.success) {
-               return ResponseEntity.ok(responseDTO);
-           } else {
-               return ResponseEntity.badRequest().body(responseDTO);
-           }
-       } catch (Exception e) {
-           logger.error("Error importing monthly ratings: {}", e.getMessage());
-           return ResponseEntity.status(500).body(new MonthlyRatingsResponseDTO(false, e.getMessage()));
-       }
+        try {
+            MonthlyRatingsResponseDTO responseDTO = monthlyRatingsService.importMonthlyRatings(requestDTO.getLinkToFile(), requestDTO.getDate());
+            logger.debug("Import monthly ratings response: success={}, message={}", responseDTO.isSuccess(), responseDTO.getMessage());
+            if (responseDTO.success) {
+                return ResponseEntity.ok(responseDTO);
+            } else {
+                return ResponseEntity.badRequest().body(responseDTO);
+            }
+        } catch (Exception e) {
+            logger.error("Error importing monthly ratings: {}", e.getMessage());
+            return ResponseEntity.status(500).body(new MonthlyRatingsResponseDTO(false, e.getMessage()));
+        }
     }
 }

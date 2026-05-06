@@ -205,7 +205,7 @@ public class GameProcessingService {
         return result;
     }
 
-    private double addAndRound(Double current, double change) {
+    public static double addAndRound(Double current, double change) {
         double val = (current != null ? current : 0.0) + change;
         return Math.round(val * 10.0) / 10.0;
     }

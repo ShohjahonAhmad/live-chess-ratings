@@ -14,7 +14,7 @@ public class LiveRating {
     @Id
     private Long fideId;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @OneToOne
     @MapsId
     @JoinColumn(name = "fide_id")
     private Player player;

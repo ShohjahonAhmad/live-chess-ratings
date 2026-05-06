@@ -8,7 +8,6 @@ public class EloCalculatorTest {
 
     private final EloCalculator eloCalculator = new EloCalculator();
 
-
     @Test
     public void testThatFindTimeControlTypeGivesCorrectEnum() {
         TimeControl result1 = eloCalculator.findTimeControlType(45);
