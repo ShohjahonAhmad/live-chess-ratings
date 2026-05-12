@@ -83,7 +83,7 @@ public class BroadcastDiscoveryWorker {
         }
 
         // Skip unrated tournaments
-        if(!broadcastDTO.rounds.getFirst().rated || broadcastDTO.tour.info.location.contains(".com")){
+        if(!broadcastDTO.rounds.getFirst().rated || (broadcastDTO.tour.info.location != null && broadcastDTO.tour.info.location.contains(".com"))){
             logger.warn("Skipping {} broadcastDTO: unrated rounds", broadcastDTO.tour.name);
             throw new IllegalArgumentException();
         }
