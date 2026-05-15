@@ -10,7 +10,10 @@ import lombok.NoArgsConstructor;
 public class TopRatingDTO {
     public Long fideId;
     public String name;
+    public String country;
+    public Short year;
     public Double rating;
     public Double ratingChange;
     public Long count;
+    public String recentGames;
 }
