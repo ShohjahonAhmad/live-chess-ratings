@@ -1,5 +1,6 @@
 package com.example.demo.batch;
 
+import com.example.demo.dto.PlayerActivenessDTO;
 import com.example.demo.entity.Player;
 import com.example.demo.entity.Rating;
 import com.example.demo.repository.PlayerRepository;
@@ -17,6 +18,7 @@ import org.springframework.batch.infrastructure.item.ItemReader;
 import org.springframework.batch.infrastructure.item.ItemWriter;
 import org.springframework.batch.infrastructure.item.xml.StaxEventItemReader;
 import org.springframework.batch.infrastructure.item.xml.builder.StaxEventItemReaderBuilder;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -45,9 +47,9 @@ public class FideImportJob {
     @Bean
     Step importPlayersStep(JobRepository jobRepository,
                            PlatformTransactionManager transactionManager,
-                           ItemReader<Player> reader,
-                           ItemProcessor<Player, Player> processor,
-                           ItemWriter<Player> writer){
+                           @Qualifier("fideImportReader") ItemReader<Player> reader,
+                           @Qualifier("fideImportProcessor") ItemProcessor<Player, Player> processor,
+                           @Qualifier("fideImportWriter")ItemWriter<Player> writer){
         return new StepBuilder("importPlayersStep", jobRepository)
                 .<Player, Player>chunk(500)
                 .transactionManager(transactionManager)
@@ -66,7 +68,9 @@ public class FideImportJob {
                 .build();
     }
 
-    @Bean
+
+
+    @Bean("fideImportReader")
     @StepScope
     StaxEventItemReader<Player> reader(@Value("#{jobParameters['fileUrl']}") String fileUrl) {
         if(fileUrl == null) throw new IllegalArgumentException("fileUrl parameter is required");
@@ -83,14 +87,14 @@ public class FideImportJob {
         }
     }
 
-    @Bean
+    @Bean("fideImportMarshaller")
     Jaxb2Marshaller playerMarshaller(){
         Jaxb2Marshaller marshaller = new Jaxb2Marshaller();
         marshaller.setClassesToBeBound(Player.class);
         return marshaller;
     }
 
-    @Bean
+    @Bean("fideImportProcessor")
     ItemProcessor<Player, Player> processor(){
         return player -> {
             if(player.getStdRating() >= 2000) return player;
@@ -98,7 +102,7 @@ public class FideImportJob {
         };
     }
 
-    @Bean
+    @Bean("fideImportWriter")
     @StepScope
     ItemWriter<Player> writer(@Value("#{jobParameters['importDate']}") String importDate, PlayerRepository playerRepository, RatingRepository ratingRepository) {
         if(importDate == null || importDate.isEmpty()) throw new IllegalArgumentException("importDate parameter is required");

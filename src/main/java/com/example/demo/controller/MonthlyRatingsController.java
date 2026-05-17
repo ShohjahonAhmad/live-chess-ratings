@@ -1,5 +1,6 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.MonthlyActivenessRequestDTO;
 import com.example.demo.dto.MonthlyRatingsRequestDTO;
 import com.example.demo.dto.MonthlyRatingsResponseDTO;
 import com.example.demo.service.MonthlyRatingsService;
@@ -24,14 +25,30 @@ public class MonthlyRatingsController {
         try {
             MonthlyRatingsResponseDTO responseDTO = monthlyRatingsService.importMonthlyRatings(requestDTO.getLinkToFile(), requestDTO.getDate());
             logger.debug("Import monthly ratings response: success={}, message={}", responseDTO.isSuccess(), responseDTO.getMessage());
-            if (responseDTO.success) {
+            if (responseDTO.isSuccess()) {
                 return ResponseEntity.ok(responseDTO);
             } else {
                 return ResponseEntity.badRequest().body(responseDTO);
             }
         } catch (Exception e) {
             logger.error("Error importing monthly ratings: {}", e.getMessage());
-            return ResponseEntity.status(500).body(new MonthlyRatingsResponseDTO(false, e.getMessage()));
+            return ResponseEntity.internalServerError().body(new MonthlyRatingsResponseDTO(false, e.getMessage()));
+        }
+    }
+
+    @PostMapping("/monthly-activeness")
+    public ResponseEntity<MonthlyRatingsResponseDTO> postMonthlyActiveness(@Valid @RequestBody MonthlyActivenessRequestDTO requestDTO) {
+        try {
+            MonthlyRatingsResponseDTO responseDTO = monthlyRatingsService.changePlayerActiveness(requestDTO.getLinkToFile(), requestDTO.getTimeControl());
+            logger.debug("Change player activeness response: success={}, message={}", responseDTO.isSuccess(), responseDTO.getMessage());
+            if(responseDTO.isSuccess()){
+                return ResponseEntity.ok(responseDTO);
+            } else {
+                return ResponseEntity.badRequest().body(responseDTO);
+            }
+        } catch (Exception e){
+            logger.error("Error changing monthly activeness: {}", e.getMessage());
+            return ResponseEntity.internalServerError().body(new MonthlyRatingsResponseDTO(false, e.getMessage()));
         }
     }
 }

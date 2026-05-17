@@ -1,6 +1,7 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.MonthlyRatingsResponseDTO;
+import com.example.demo.utils.TimeControl;
 import jakarta.transaction.Transactional;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.parameters.JobParameters;
@@ -11,12 +12,13 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class MonthlyRatingsService {
-    @Qualifier("importPlayersJob")
     private final Job fideImportJob;
+    private final Job changeActivenessJob;
     private final JobOperator jobOperator;
 
-    public MonthlyRatingsService(Job fideImportJob, JobOperator jobOperator) {
+    public MonthlyRatingsService(@Qualifier("importPlayersJob") Job fideImportJob, @Qualifier("changeActiveness") Job changeActivenessJob, JobOperator jobOperator) {
         this.fideImportJob = fideImportJob;
+        this.changeActivenessJob = changeActivenessJob;
         this.jobOperator = jobOperator;
     }
 
@@ -29,9 +31,32 @@ public class MonthlyRatingsService {
                     .toJobParameters();
             jobOperator.start(fideImportJob, jobParams);
 
-            return new MonthlyRatingsResponseDTO(true ,"Import job started successfully"); //how do i get number of rows added do you want me to make call to db count of monthly ratings table with given date
+            return new MonthlyRatingsResponseDTO(true ,"Import job completed successfully");
         } catch (Exception e) {
             return new MonthlyRatingsResponseDTO(false, e.getMessage());
+        }
+    }
+
+    public MonthlyRatingsResponseDTO changePlayerActiveness(String fileUrl, String timeControl) {
+        try {
+            validate(timeControl);
+            JobParameters jobParams = new JobParametersBuilder()
+                    .addString("fileUrl", fileUrl)
+                    .addString("timeControl", timeControl)
+                    .toJobParameters();
+            jobOperator.start(changeActivenessJob, jobParams);
+
+            return new MonthlyRatingsResponseDTO(true, "Change activeness job completed successfully");
+        } catch (Exception e) {
+            return new MonthlyRatingsResponseDTO(false, e.getMessage());
+        }
+    }
+
+    private void validate(String timeControl) {
+        try {
+            TimeControl.valueOf(timeControl.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid time control: " + timeControl + ". Must be one of: STD, RAPID, BLITZ");
         }
     }
 }

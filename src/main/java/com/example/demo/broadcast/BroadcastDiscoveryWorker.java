@@ -39,7 +39,7 @@ public class BroadcastDiscoveryWorker {
         logger.info("Starting broadcast discovery...");
         
         webClient.get()
-                .uri("/api/broadcast?nb=100&live=true")
+                .uri("/api/broadcast?nb="+MAX_BROADCASTS+"&live=true")
                 .retrieve()
                 .bodyToFlux(BroadcastDTO.class)
                 .retryWhen(Retry.backoff(3, Duration.ofSeconds(2))
@@ -83,7 +83,7 @@ public class BroadcastDiscoveryWorker {
         }
 
         // Skip unrated tournaments
-        if(!broadcastDTO.rounds.getFirst().rated || (broadcastDTO.tour.info.location != null && broadcastDTO.tour.info.location.contains(".com"))){
+        if((!broadcastDTO.rounds.getFirst().rated && !broadcastDTO.rounds.getLast().rated) || (broadcastDTO.tour.info.location != null && broadcastDTO.tour.info.location.contains(".com"))){
             logger.warn("Skipping {} broadcastDTO: unrated rounds", broadcastDTO.tour.name);
             throw new IllegalArgumentException();
         }

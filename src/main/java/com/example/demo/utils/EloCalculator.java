@@ -54,7 +54,7 @@ public class EloCalculator {
      */
     public TimeControl findTimeControlType(double time) {
         time = Math.abs(time);
-        if(time <= 10.0) return TimeControl.BLITZ;
+        if(time < 10.0) return TimeControl.BLITZ;
         else if( time < 45.0) return TimeControl.RAPID;
         return TimeControl.STD;
     }

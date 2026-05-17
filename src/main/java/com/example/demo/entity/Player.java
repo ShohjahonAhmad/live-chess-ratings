@@ -1,10 +1,7 @@
 package com.example.demo.entity;
 
 import jakarta.persistence.*;
-import jakarta.xml.bind.annotation.XmlAccessType;
-import jakarta.xml.bind.annotation.XmlAccessorType;
-import jakarta.xml.bind.annotation.XmlElement;
-import jakarta.xml.bind.annotation.XmlRootElement;
+import jakarta.xml.bind.annotation.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -43,6 +40,14 @@ public class Player {
     @XmlElement(name = "flag")
     @Column(length = 2, columnDefinition = "CHAR(2)")
     private String flag;
+
+    @XmlTransient
+    @Column(length = 2, columnDefinition = "CHAR(2)")
+    private String rapidFlag;
+
+    @XmlTransient
+    @Column(length = 2, columnDefinition = "CHAR(2)")
+    private String blitzFlag;
 
     @XmlElement(name = "k")
     @Column(name = "std_k")

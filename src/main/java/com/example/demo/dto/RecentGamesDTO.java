@@ -12,6 +12,7 @@ public class RecentGamesDTO {
     public String id;
     public Long opponentFideId;
     public String opponentName;
+    public Short opponentRating;
     public Double change;
     public Result result;
     public String date;
