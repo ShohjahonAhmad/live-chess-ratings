@@ -42,6 +42,9 @@ public class Game {
     @Column(name = "black_rating_change")
     private Double blackRatingChange;
 
+    @Column(name = "unknown_player_name")
+    private String unknownPlayerName;
+
     @Enumerated(EnumType.STRING)
     private Result result;
 

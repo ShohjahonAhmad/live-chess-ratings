@@ -20,7 +20,7 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
                         JSON_BUILD_OBJECT(
                             'id',           g.id,
                             'opponentFideId', CASE WHEN p.fide_id = g.white_fide_id THEN bp.fide_id ELSE wp.fide_id END,
-                            'opponentName',  CASE WHEN p.fide_id = g.white_fide_id THEN bp.name ELSE wp.name END,
+                            'opponentName',  CASE WHEN p.fide_id = g.white_fide_id THEN COALESCE(bp.name, g.unknown_player_name) ELSE COALESCE(wp.name, g.unknown_player_name) END,
                             'opponentRating', CASE WHEN p.fide_id = g.white_fide_id THEN g.black_rating ELSE g.white_rating END,
                             'change',        CASE WHEN p.fide_id = g.white_fide_id THEN g.white_rating_change ELSE g.black_rating_change END,
                             'result',        g.result,
@@ -55,7 +55,7 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
                         JSON_BUILD_OBJECT(
                             'id',           g.id,
                             'opponentFideId', CASE WHEN p.fide_id = g.white_fide_id THEN bp.fide_id ELSE wp.fide_id END,
-                            'opponentName',  CASE WHEN p.fide_id = g.white_fide_id THEN bp.name ELSE wp.name END,
+                            'opponentName',  CASE WHEN p.fide_id = g.white_fide_id THEN COALESCE(bp.name, g.unknown_player_name) ELSE COALESCE(wp.name, g.unknown_player_name) END,
                             'change',        CASE WHEN p.fide_id = g.white_fide_id THEN g.white_rating_change ELSE g.black_rating_change END,
                             'opponentRating', CASE WHEN p.fide_id = g.white_fide_id THEN g.black_rating ELSE g.white_rating END,
                             'result',        g.result,
@@ -90,7 +90,7 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
                         JSON_BUILD_OBJECT(
                             'id',           g.id,
                             'opponentFideId', CASE WHEN p.fide_id = g.white_fide_id THEN bp.fide_id ELSE wp.fide_id END,
-                            'opponentName',  CASE WHEN p.fide_id = g.white_fide_id THEN bp.name ELSE wp.name END,
+                            'opponentName',  CASE WHEN p.fide_id = g.white_fide_id THEN COALESCE(bp.name, g.unknown_player_name) ELSE COALESCE(wp.name, g.unknown_player_name) END,
                             'opponentRating', CASE WHEN p.fide_id = g.white_fide_id THEN g.black_rating ELSE g.white_rating END,
                             'change',        CASE WHEN p.fide_id = g.white_fide_id THEN g.white_rating_change ELSE g.black_rating_change END,
                             'result',        g.result,

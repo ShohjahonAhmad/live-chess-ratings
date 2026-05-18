@@ -49,13 +49,14 @@ public class GameProcessingService {
         try {
             game = getGame(pgn, ignoredGames, tournament);
         } catch (RuntimeException e) {
-            logger.warn(e.getMessage());
             return;
         }
         game.setRound(round);
 
         Player whitePlayer = getPlayer(game.getWhiteFideId());
         Player blackPlayer = getPlayer(game.getBlackFideId());
+
+        setGameUnknownPlayerName(pgn, game, whitePlayer, blackPlayer);
 
         if(areBothPlayersNull(whitePlayer, blackPlayer)) {
             ignoredGames.put(game.getId(), true);
@@ -72,6 +73,11 @@ public class GameProcessingService {
 
         gameRepository.save(game);
         logger.debug("Game {} saved: {} vs {} - Result: {}", game.getId(), game.getWhiteFideId(), game.getBlackFideId(), game.getResult());
+    }
+
+    private void setGameUnknownPlayerName(String pgn, Game game, Player whitePlayer, Player blackPlayer) {
+        if(whitePlayer == null) game.setUnknownPlayerName(extractMatch(pgn, Pattern.compile("\\[White \"([^\"]+)\"\\]"), 1));
+        if(blackPlayer == null) game.setUnknownPlayerName(extractMatch(pgn, Pattern.compile("\\[Black \"([^\"]+)\"\\]"), 1));
     }
 
     private Game getGame(String pgn, Map<String, Boolean> ignoredGames, Tournament tournament ) {
