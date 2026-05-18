@@ -14,7 +14,7 @@ public class EloCalculator {
      * @param ratingB Recent monthly rating of player B
      * @return The expected score (win probability) between 0.0 and 1.0
      */
-    public double calculateExpectedScore(int ratingA, int ratingB){
+    public static double calculateExpectedScore(int ratingA, int ratingB){
         int diff = ratingA - ratingB;
         boolean aIsHigher = diff >= 0;
         int d = Math.abs(diff);
@@ -42,7 +42,7 @@ public class EloCalculator {
      * @param expectedScore win probability between 0.0 and 1.0
      * @return The rating change (rating gain/loss), rounded to one decimal place
      */
-    public double calculateRatingChange(int k, double actualScore, double expectedScore) {
+    public static double calculateRatingChange(int k, double actualScore, double expectedScore) {
         double rawChange = k * (actualScore - expectedScore);
         return Math.round(rawChange * 10.0) / 10.0;
     }
@@ -52,7 +52,7 @@ public class EloCalculator {
      * @param time total time given in the beginning of the game
      * @return time control type
      */
-    public TimeControl findTimeControlType(double time) {
+    public static TimeControl findTimeControlType(double time) {
         time = Math.abs(time);
         if(time < 10.0) return TimeControl.BLITZ;
         else if( time < 45.0) return TimeControl.RAPID;

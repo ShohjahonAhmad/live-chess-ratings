@@ -12,9 +12,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -41,62 +41,84 @@ public class GameProcessingService {
     private static final Pattern BLACK_RATING = Pattern.compile("\\[BlackElo \"(\\d+)\"\\]");
     private static final Pattern TIME_CONTROL_PATTERN = Pattern.compile("\\[TimeControl \"([^\"]+)\"\\]");
 
-
     @Transactional
     public void processPgn(String pgn, BroadcastRound round, Map<String, Boolean> ignoredGames) {
-        String result = extractMatch(pgn, RESULT_PATTERN, 1);
-
-        if(result == null || result.contains("*")) return;
-        String gameId = extractMatch(pgn, ID_PATTERN, 1);
-
-        if(gameId == null || ignoredGames.containsKey(gameId) || gameRepository.existsById(gameId)) return;
-
         Tournament tournament = round.getTournament();
 
-        LocalDate today = LocalDate.now();
-
-        String whiteFideId = extractMatch(pgn, WHITE_FIDE_PATTERN, 1);
-        String blackFideId = extractMatch(pgn, BLACK_FIDE_PATTERN, 1);
-
-        Player whitePlayer = null;
-        if(whiteFideId != null) {
-            whitePlayer = playerRepository.findById(Long.valueOf(whiteFideId)).orElse(null);
+        Game game;
+        try {
+            game = getGame(pgn, ignoredGames, tournament);
+        } catch (RuntimeException e) {
+            logger.warn(e.getMessage());
+            return;
         }
-        Player blackPlayer = null;
-        if(blackFideId != null) {
-            blackPlayer = playerRepository.findById(Long.valueOf(blackFideId)).orElse(null);
-        }
+        game.setRound(round);
 
-        if(whitePlayer == null && blackPlayer == null) {
-            ignoredGames.put(gameId, true);
+        Player whitePlayer = getPlayer(game.getWhiteFideId());
+        Player blackPlayer = getPlayer(game.getBlackFideId());
+
+        if(areBothPlayersNull(whitePlayer, blackPlayer)) {
+            ignoredGames.put(game.getId(), true);
             return;
         }
 
-        String whiteRatingPgn = extractMatch(pgn, WHITE_RATING, 1);
-        short whiteRating = Short.parseShort(whiteRatingPgn != null ? whiteRatingPgn : "0");
-        String blackRatingPgn = extractMatch(pgn, BLACK_RATING, 1);
-        short blackRating = Short.parseShort(blackRatingPgn != null ? blackRatingPgn : "0");
-        String timeControl = extractMatch(pgn, TIME_CONTROL_PATTERN, 1);
+        // Set the rating changes on the game object
+        updateGameRatingChange(whitePlayer, game);
+        updateGameRatingChange(blackPlayer, game);
+
+        // Update live ratings
+        updateLiveRatingByTimeControl(whitePlayer, game.getTimeControl(), game.getWhiteRatingChange());
+        updateLiveRatingByTimeControl(blackPlayer, game.getTimeControl(), game.getBlackRatingChange());
+
+        gameRepository.save(game);
+        logger.debug("Game {} saved: {} vs {} - Result: {}", game.getId(), game.getWhiteFideId(), game.getBlackFideId(), game.getResult());
+    }
+
+    private Game getGame(String pgn, Map<String, Boolean> ignoredGames, Tournament tournament ) {
+        String result = extractMatch(pgn, RESULT_PATTERN, 1);
+        if(isGameGoing(result)) throw new IllegalStateException("Game is still going");
 
         Game game = new Game();
 
+        String gameId = extractMatch(pgn, ID_PATTERN, 1);
+        if(gameId == null || ignoredGames.containsKey(gameId) || gameRepository.existsById(gameId)) throw new IllegalArgumentException("Game already processed or ignored: " + gameId);
         game.setId(gameId);
-        game.setDate(today);
-        game.setWhiteFideId(whiteFideId != null ? Long.parseLong(whiteFideId) : null);
-        game.setBlackFideId(blackFideId != null ? Long.parseLong(blackFideId) : null);
+        game.setDate(LocalDate.now());
+
+        String whiteFideId = extractMatch(pgn, WHITE_FIDE_PATTERN, 1);
+        game.setWhiteFideId(whiteFideId == null ? null : Long.parseLong(whiteFideId));
+
+        String blackFideId = extractMatch(pgn, BLACK_FIDE_PATTERN, 1);
+        game.setBlackFideId(blackFideId == null ? null : Long.parseLong(blackFideId));
+
+        String whiteRatingPgn = extractMatch(pgn, WHITE_RATING, 1);
+        short whiteRating = Short.parseShort(whiteRatingPgn != null ? whiteRatingPgn : "0");
+        game.setWhiteRating(whiteRating);
+
+        String blackRatingPgn = extractMatch(pgn, BLACK_RATING, 1);
+        short blackRating = Short.parseShort(blackRatingPgn != null ? blackRatingPgn : "0");
+        game.setBlackRating(blackRating);
+
         Result resultEnum = "1-0".equals(result) ? Result.WIN : "0-1".equals(result) ? Result.LOSS : Result.DRAW;
         game.setResult(resultEnum);
-        game.setWhiteRating(whiteRating);
-        game.setBlackRating(blackRating);
-        game.setRound(round);
 
-        EloCalculator eloCalculator = new EloCalculator();
+        String timeControl = extractMatch(pgn, TIME_CONTROL_PATTERN, 1);
+        game.setTimeControl(resolveTimeControl(timeControl, tournament));
 
+
+        return game;
+    }
+
+    private boolean isGameGoing(String result) {
+        return result == null || result.contains("*");
+    }
+
+    private TimeControl resolveTimeControl (String timeControl, Tournament tournament) {
         TimeControl tcType = TimeControl.STD;
         if (timeControl != null) {
             try {
                 double timeValue = getFirstNumberFromString(timeControl.trim());
-                tcType = eloCalculator.findTimeControlType(timeValue);
+                tcType = EloCalculator.findTimeControlType(timeValue);
             } catch (Exception e) {
                 // Ignore parse errors safely
             }
@@ -105,80 +127,89 @@ public class GameProcessingService {
             if (tournament.getTc() != null) {
                 try {
                     double timeValue = Double.parseDouble(tournament.getTc().split(" ")[0]);
-                    tcType = eloCalculator.findTimeControlType(timeValue);
+                    tcType = EloCalculator.findTimeControlType(timeValue);
                 } catch (Exception e) {
                     // fallback to std if parsing fails
-                    tcType = TimeControl.STD;
                 }
             }
         }
+        return tcType;
+    }
 
-        if(whitePlayer != null && tcType != null) {
-            int k = 0;
-            switch (tcType) {
-                case TimeControl.BLITZ -> k = whitePlayer.getBlitzK() != null ? whitePlayer.getBlitzK() : 20;
-                case TimeControl.RAPID -> k = whitePlayer.getRapidK() != null ? whitePlayer.getRapidK() : 20;
-                case TimeControl.STD   -> k = whitePlayer.getStdK() != null ? whitePlayer.getStdK() : 20;
+    private Player getPlayer(Long fideId){
+        if(fideId == null) return null;
+
+        return playerRepository.findById(fideId).orElse(null);
+    }
+
+    private boolean areBothPlayersNull(Player whitePlayer, Player blackPlayer) {
+        return whitePlayer == null && blackPlayer == null;
+    }
+
+    private void updateGameRatingChange(Player player, Game game) {
+        if(player == null || game.getTimeControl() == null) return;
+        int k = getKFactor(player, game.getTimeControl());
+
+        boolean isWhitePlayer = Objects.equals(player.getFideId(), game.getWhiteFideId());
+
+        double ratingChange = getRatingChange(game, isWhitePlayer, k);
+
+        if(isWhitePlayer) {
+            game.setWhiteRatingChange(ratingChange);
+        } else{
+            game.setBlackRatingChange(ratingChange);
+        }
+    }
+
+    private int getKFactor(Player player, TimeControl timeControl) {
+        return switch (timeControl) {
+            case TimeControl.BLITZ -> player.getBlitzK() != null ? player.getBlitzK() : 20;
+            case TimeControl.RAPID -> player.getRapidK() != null ? player.getRapidK() : 20;
+            case TimeControl.STD   -> player.getStdK() != null ? player.getStdK() : 20;
+        };
+    }
+
+    private double getRatingChange(Game game, boolean isWhitePlayer, int k) {
+        double actualScore = getActualScore(isWhitePlayer, game.getResult());
+        double expectedScore = getExpectedScore(isWhitePlayer, game.getWhiteRating(), game.getBlackRating());
+
+        return EloCalculator.calculateRatingChange(k, actualScore, expectedScore);
+    }
+
+    private double getActualScore(boolean isWhitePlayer, Result result) {
+        if (isWhitePlayer) {
+            return result == Result.WIN ? 1.0 : (result == Result.LOSS ? 0.0 : 0.5);
+        }
+        return result == Result.LOSS ? 1.0 : (result == Result.WIN ? 0.0 : 0.5);
+    }
+
+    private double getExpectedScore(boolean isWhitePlayer, short whiteRating, short blackRating) {
+        if (isWhitePlayer) {
+            return EloCalculator.calculateExpectedScore(whiteRating, blackRating);
+        }
+        return EloCalculator.calculateExpectedScore(blackRating, whiteRating);
+    }
+
+    private void updateLiveRatingByTimeControl(Player player, TimeControl timeControl, double ratingChange){
+        if(player == null) return;
+        LiveRating liveRating = liveRatingRepository.findById(player.getFideId()).orElse(null);
+        if (liveRating == null) return;
+
+        switch (timeControl) {
+            case TimeControl.BLITZ -> {
+                liveRating.setBlitzRating(addAndRound(liveRating.getBlitzRating(), ratingChange));
+                liveRating.setBlitzChange(addAndRound(liveRating.getBlitzChange(), ratingChange));
             }
-
-            double actualScore = resultEnum == Result.WIN ? 1.0 : (resultEnum == Result.LOSS ? 0.0 : 0.5);
-            double expectedScore = eloCalculator.calculateExpectedScore(whiteRating, blackRating);
-            game.setWhiteRatingChange(eloCalculator.calculateRatingChange(k, actualScore, expectedScore));
-
-            LiveRating liveRating = liveRatingRepository.findById(whitePlayer.getFideId()).orElse(null);
-            if (liveRating != null) {
-                switch (tcType) {
-                    case TimeControl.BLITZ -> {
-                        liveRating.setBlitzRating(addAndRound(liveRating.getBlitzRating(), game.getWhiteRatingChange()));
-                        liveRating.setBlitzChange(addAndRound(liveRating.getBlitzChange(), game.getWhiteRatingChange()));
-                    }
-                    case TimeControl.RAPID -> {
-                        liveRating.setRapidRating(addAndRound(liveRating.getRapidRating(), game.getWhiteRatingChange()));
-                        liveRating.setRapidChange(addAndRound(liveRating.getRapidChange(), game.getWhiteRatingChange()));
-                    }
-                    case TimeControl.STD   -> {
-                        liveRating.setStdRating(addAndRound(liveRating.getStdRating(), game.getWhiteRatingChange()));
-                        liveRating.setStdChange(addAndRound(liveRating.getStdChange(), game.getWhiteRatingChange()));
-                    }
-                }
-                liveRatingRepository.save(liveRating);
+            case TimeControl.RAPID -> {
+                liveRating.setRapidRating(addAndRound(liveRating.getRapidRating(), ratingChange));
+                liveRating.setRapidChange(addAndRound(liveRating.getRapidChange(), ratingChange));
+            }
+            case TimeControl.STD   -> {
+                liveRating.setStdRating(addAndRound(liveRating.getStdRating(), ratingChange));
+                liveRating.setStdChange(addAndRound(liveRating.getStdChange(), ratingChange));
             }
         }
-
-        if(blackPlayer != null && tcType != null) {
-            int k = 0;
-            switch (tcType) {
-                case TimeControl.BLITZ -> k = blackPlayer.getBlitzK() != null ? blackPlayer.getBlitzK() : 20;
-                case TimeControl.RAPID -> k = blackPlayer.getRapidK() != null ? blackPlayer.getRapidK() : 20;
-                case TimeControl.STD   -> k = blackPlayer.getStdK() != null ? blackPlayer.getStdK() : 20;
-            }
-
-            double actualScore = resultEnum == Result.LOSS ? 1.0 : (resultEnum == Result.WIN ? 0.0 : 0.5);
-            double expectedScore = eloCalculator.calculateExpectedScore(blackRating, whiteRating);
-            game.setBlackRatingChange(eloCalculator.calculateRatingChange(k, actualScore, expectedScore));
-
-            LiveRating liveRating = liveRatingRepository.findById(blackPlayer.getFideId()).orElse(null);
-            if (liveRating != null) {
-                switch (tcType) {
-                    case TimeControl.BLITZ -> {
-                        liveRating.setBlitzRating(addAndRound(liveRating.getBlitzRating(), game.getBlackRatingChange()));
-                        liveRating.setBlitzChange(addAndRound(liveRating.getBlitzChange(), game.getBlackRatingChange()));
-                    }
-                    case TimeControl.RAPID -> {
-                        liveRating.setRapidRating(addAndRound(liveRating.getRapidRating(), game.getBlackRatingChange()));
-                        liveRating.setRapidChange(addAndRound(liveRating.getRapidChange(), game.getBlackRatingChange()));
-                    }
-                    case TimeControl.STD  -> {
-                        liveRating.setStdRating(addAndRound(liveRating.getStdRating(), game.getBlackRatingChange()));
-                        liveRating.setStdChange(addAndRound(liveRating.getStdChange(), game.getBlackRatingChange()));
-                    }
-                }
-                liveRatingRepository.save(liveRating);
-            }
-        }
-        game.setTimeControl(tcType);
-        gameRepository.save(game);
-        logger.debug("Game {} saved: {} vs {} - Result: {}", gameId, whiteFideId, blackFideId, result);
+        liveRatingRepository.save(liveRating);
     }
 
     private String extractMatch(String text, Pattern pattern, int group) {
