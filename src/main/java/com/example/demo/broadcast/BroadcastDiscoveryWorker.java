@@ -18,6 +18,7 @@ import reactor.util.retry.Retry;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Component
 public class BroadcastDiscoveryWorker {
@@ -71,8 +72,15 @@ public class BroadcastDiscoveryWorker {
         }
 
         for(BroadcastDTO.RoundDTO roundDTO : broadcastDTO.rounds) {
-            saveTournamentRound(roundDTO, existingTournament);
+            if(roundDTO.ongoing || isRecentlyFinished(roundDTO.finishedAt))
+                saveTournamentRound(roundDTO, existingTournament);
         }
+    }
+
+    private boolean isRecentlyFinished(Long finishedAt) {
+        if(finishedAt == null) return false;
+        long tenMinutesAgo = Instant.now().minus(Duration.ofMinutes(5)).toEpochMilli();
+        return finishedAt >= tenMinutesAgo;
     }
 
     private void validateBroadcast(BroadcastDTO broadcastDTO) {
@@ -246,7 +254,7 @@ public class BroadcastDiscoveryWorker {
                                     }))
                             .doOnNext(dto -> {
                                 if (dto.round != null) {
-                                    if (dto.round.finished) {
+                                    if (dto.round.finished && !isRecentlyFinished(dto.round.finishedAt)) {
                                         round.setStatus(Status.FINISHED);
                                         if (dto.round.finishedAt != null && dto.round.finishedAt > 0) {
                                             round.setEndsAt(Instant.ofEpochMilli(dto.round.finishedAt));

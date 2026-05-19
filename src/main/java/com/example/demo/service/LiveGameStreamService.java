@@ -24,7 +24,7 @@ public class LiveGameStreamService {
     
     // LRU Cache to hold a maximum of 10,000 ignored games to prevent memory leaks
     private final Map<String, Boolean> ignoredGames = Collections.synchronizedMap(
-            new LinkedHashMap<String, Boolean>(10000, 0.75f, true) {
+            new LinkedHashMap<>(10000, 0.75f, true) {
                 @Override
                 protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
                     return size() > 10000; 
@@ -64,16 +64,13 @@ public class LiveGameStreamService {
                                 }
                             })
                             .retryWhen(Retry.backoff(3, java.time.Duration.ofSeconds(2))
-                                    .doBeforeRetry(retrySignal -> {
-                                        logger.warn("Retrying stream for round {} (attempt {}/3)", round.getId(), retrySignal.totalRetries() + 1);
-                                    })
+                                    .doBeforeRetry(retrySignal -> logger.warn("Retrying stream for round {} (attempt {}/3)", round.getId(), retrySignal.totalRetries() + 1))
                             )
-                            .doOnError(error -> {
-                                logger.error("Error in game stream for round {}: {}", round.getName(), error.getMessage());
-                            })
-                            .doFinally(signalType -> {
-                                logger.info("Ended stream for round {} from {} with signal: {}", round.getName(), round.getTournament().getName(), signalType);
-                            })
+                            .doOnError(error -> logger.error("Error in game stream for round {}: {}", round.getName(), error.getMessage())
+                            )
+                            .doFinally(signalType ->
+                                logger.info("Ended stream for round {} from {} with signal: {}", round.getName(), round.getTournament().getName(), signalType)
+                            )
                             .then(); // ensures we fully complete this stream before moving to the next round
                 })
                 .blockLast(); // Blocks the scheduled thread until all rounds are visited sequentially

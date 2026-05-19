@@ -57,4 +57,10 @@ public class Game {
     @CreationTimestamp
     @Column(name = "created_at", insertable = false, updatable = false )
     private Instant createdAt;
+
+    @Column(name = "last_move")
+    private String lastMove;
+
+    @Column(name = "move_count")
+    private Short moveCount;
 }

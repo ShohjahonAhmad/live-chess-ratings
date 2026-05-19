@@ -24,7 +24,6 @@ public class LiveRatingRefreshService {
     private final LiveRatingRepository liveRatingRepository;
     private final RatingRepository ratingRepository;
     private final GameRepository gameRepository;
-    private int anInt;
 
     public LiveRatingRefreshService(LiveRatingRepository liveRatingRepository, RatingRepository ratingRepository, GameRepository gameRepository) {
         this.liveRatingRepository = liveRatingRepository;

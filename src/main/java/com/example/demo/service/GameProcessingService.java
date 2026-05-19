@@ -20,6 +20,17 @@ import java.util.regex.Pattern;
 
 @Service
 public class GameProcessingService {
+    private static final Logger logger = LoggerFactory.getLogger(GameProcessingService.class);
+    private static final Pattern ID_PATTERN = Pattern.compile("\\[(?:Site|GameURL) \".*/([^/\"{}]+)\"]");
+    private static final Pattern WHITE_FIDE_PATTERN = Pattern.compile("\\[WhiteFideId \"(\\d+)\"]");
+    private static final Pattern BLACK_FIDE_PATTERN = Pattern.compile("\\[BlackFideId \"(\\d+)\"]");
+    private static final Pattern WHITE_NAME_PATTERN = Pattern.compile("\\[White \"([^\"]+)\"]");
+    private static final Pattern BLACK_NAME_PATTERN = Pattern.compile("\\[Black \"([^\"]+)\"]");
+    private static final Pattern RESULT_PATTERN = Pattern.compile("\\[Result \"([^\"]+)\"]");
+    private static final Pattern WHITE_RATING_PATTERN = Pattern.compile("\\[WhiteElo \"(\\d+)\"]");
+    private static final Pattern BLACK_RATING_PATTERN = Pattern.compile("\\[BlackElo \"(\\d+)\"]");
+    private static final Pattern TIME_CONTROL_PATTERN = Pattern.compile("\\[TimeControl \"([^\"]+)\"]");
+    private static final Pattern MOVE_PATTERN = Pattern.compile("\\d+\\.{1,3}\\s+(\\S+)(?:\\s+\\{[^}]*})?");
 
     private final GameRepository gameRepository;
     private final PlayerRepository playerRepository;
@@ -32,22 +43,13 @@ public class GameProcessingService {
         this.liveRatingRepository = liveRatingRepository;
     }
 
-    private static final Logger logger = LoggerFactory.getLogger(GameProcessingService.class);
-    private static final Pattern ID_PATTERN = Pattern.compile("\\[(?:Site|GameURL) \".*/([^/\"{}]+)\"\\]");
-    private static final Pattern WHITE_FIDE_PATTERN = Pattern.compile("\\[WhiteFideId \"(\\d+)\"\\]");
-    private static final Pattern BLACK_FIDE_PATTERN = Pattern.compile("\\[BlackFideId \"(\\d+)\"\\]");
-    private static final Pattern RESULT_PATTERN = Pattern.compile("\\[Result \"([^\"]+)\"\\]");
-    private static final Pattern WHITE_RATING = Pattern.compile("\\[WhiteElo \"(\\d+)\"\\]");
-    private static final Pattern BLACK_RATING = Pattern.compile("\\[BlackElo \"(\\d+)\"\\]");
-    private static final Pattern TIME_CONTROL_PATTERN = Pattern.compile("\\[TimeControl \"([^\"]+)\"\\]");
-
     @Transactional
     public void processPgn(String pgn, BroadcastRound round, Map<String, Boolean> ignoredGames) {
         Tournament tournament = round.getTournament();
 
         Game game;
         try {
-            game = getGame(pgn, ignoredGames, tournament);
+            game = getGame(pgn, ignoredGames, tournament, round);
         } catch (RuntimeException e) {
             return;
         }
@@ -76,18 +78,34 @@ public class GameProcessingService {
     }
 
     private void setGameUnknownPlayerName(String pgn, Game game, Player whitePlayer, Player blackPlayer) {
-        if(whitePlayer == null) game.setUnknownPlayerName(extractMatch(pgn, Pattern.compile("\\[White \"([^\"]+)\"\\]"), 1));
-        if(blackPlayer == null) game.setUnknownPlayerName(extractMatch(pgn, Pattern.compile("\\[Black \"([^\"]+)\"\\]"), 1));
+        if(whitePlayer == null) game.setUnknownPlayerName(extractMatch(pgn, WHITE_NAME_PATTERN, 1));
+        if(blackPlayer == null) game.setUnknownPlayerName(extractMatch(pgn, BLACK_NAME_PATTERN, 1));
     }
 
-    private Game getGame(String pgn, Map<String, Boolean> ignoredGames, Tournament tournament ) {
+    private Game getGame(String pgn, Map<String, Boolean> ignoredGames, Tournament tournament, BroadcastRound round ) {
+        String gameId = extractMatch(pgn, ID_PATTERN, 1);
         String result = extractMatch(pgn, RESULT_PATTERN, 1);
         if(isGameGoing(result)) throw new IllegalStateException("Game is still going");
 
-        Game game = new Game();
+        Matcher m = MOVE_PATTERN.matcher(pgn);
+        String lastMove = "";
+        short count = 0;
+        while(m.find()){
+            lastMove = m.group(1);
+            count++;
+        }
 
-        String gameId = extractMatch(pgn, ID_PATTERN, 1);
-        if(gameId == null || ignoredGames.containsKey(gameId) || gameRepository.existsById(gameId)) throw new IllegalArgumentException("Game already processed or ignored: " + gameId);
+        if(count == 0) {
+            logger.debug("Game {} has no moves yet, skipping until moves arrive", gameId);
+            throw new IllegalArgumentException("Game has no moves yet: " + gameId);
+        }
+
+        Game game = new Game();
+        if(gameId == null || ignoredGames.containsKey(gameId)) throw new IllegalArgumentException("Game already processed or ignored: " + gameId);
+        if(gameRepository.existsById(gameId)) {
+            ignoredGames.put(gameId, true);
+            throw new IllegalArgumentException("Game with id " + gameId + " already exists in database");
+        }
         game.setId(gameId);
         game.setDate(LocalDate.now());
 
@@ -97,16 +115,26 @@ public class GameProcessingService {
         String blackFideId = extractMatch(pgn, BLACK_FIDE_PATTERN, 1);
         game.setBlackFideId(blackFideId == null ? null : Long.parseLong(blackFideId));
 
-        String whiteRatingPgn = extractMatch(pgn, WHITE_RATING, 1);
+        Result resultEnum = "1-0".equals(result) ? Result.WIN : "0-1".equals(result) ? Result.LOSS : Result.DRAW;
+        game.setResult(resultEnum);
+
+        logger.debug("Extracted last move: {} and move count: {} for game {}", lastMove, count, gameId);
+
+        game.setLastMove(lastMove);
+        game.setMoveCount(count);
+
+        if(gameRepository.existsByWhiteFideIdAndBlackFideIdAndRoundIdAndMoveCountAndLastMove(game.getWhiteFideId(), game.getBlackFideId(), round.getId(), game.getMoveCount(), game.getLastMove())) {
+            ignoredGames.put(gameId, true);
+            throw new IllegalArgumentException("Game with same players, round, result, move count and last move already exists");
+        }
+
+        String whiteRatingPgn = extractMatch(pgn, WHITE_RATING_PATTERN, 1);
         short whiteRating = Short.parseShort(whiteRatingPgn != null ? whiteRatingPgn : "0");
         game.setWhiteRating(whiteRating);
 
-        String blackRatingPgn = extractMatch(pgn, BLACK_RATING, 1);
+        String blackRatingPgn = extractMatch(pgn, BLACK_RATING_PATTERN, 1);
         short blackRating = Short.parseShort(blackRatingPgn != null ? blackRatingPgn : "0");
         game.setBlackRating(blackRating);
-
-        Result resultEnum = "1-0".equals(result) ? Result.WIN : "0-1".equals(result) ? Result.LOSS : Result.DRAW;
-        game.setResult(resultEnum);
 
         String timeControl = extractMatch(pgn, TIME_CONTROL_PATTERN, 1);
         game.setTimeControl(resolveTimeControl(timeControl, tournament));
@@ -196,8 +224,8 @@ public class GameProcessingService {
         return EloCalculator.calculateExpectedScore(blackRating, whiteRating);
     }
 
-    private void updateLiveRatingByTimeControl(Player player, TimeControl timeControl, double ratingChange){
-        if(player == null) return;
+    private void updateLiveRatingByTimeControl(Player player, TimeControl timeControl, Double ratingChange){
+        if(player == null || ratingChange == null) return;
         LiveRating liveRating = liveRatingRepository.findById(player.getFideId()).orElse(null);
         if (liveRating == null) return;
 
