@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class TopRatingDTO {
+    public Long rank;
     public Long fideId;
     public String name;
     public String country;

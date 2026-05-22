@@ -31,6 +31,7 @@ public class GameProcessingService {
     private static final Pattern BLACK_RATING_PATTERN = Pattern.compile("\\[BlackElo \"(\\d+)\"]");
     private static final Pattern TIME_CONTROL_PATTERN = Pattern.compile("\\[TimeControl \"([^\"]+)\"]");
     private static final Pattern MOVE_PATTERN = Pattern.compile("\\d+\\.{1,3}\\s+(\\S+)(?:\\s+\\{[^}]*})?");
+    Pattern MINUTE_PATTERN = Pattern.compile("(\\d+)\\s*(min|minutes)", Pattern.CASE_INSENSITIVE);;
 
     private final GameRepository gameRepository;
     private final PlayerRepository playerRepository;
@@ -160,8 +161,15 @@ public class GameProcessingService {
             // If time control is missing, try to infer from tournament settings
             if (tournament.getTc() != null) {
                 try {
-                    double timeValue = Double.parseDouble(tournament.getTc().split(" ")[0]);
-                    tcType = EloCalculator.findTimeControlType(timeValue);
+                    Matcher matcher = MINUTE_PATTERN.matcher(tournament.getTc());
+                    double maxMinutes = 0;
+                    while(matcher.find()){
+                        double timeValue = Double.parseDouble(matcher.group(1));
+                        maxMinutes = Math.max(timeValue, maxMinutes);
+                    }
+                    if(maxMinutes > 0) {
+                        tcType = EloCalculator.findTimeControlType(maxMinutes);
+                    }
                 } catch (Exception e) {
                     // fallback to std if parsing fails
                 }
@@ -254,21 +262,18 @@ public class GameProcessingService {
 
     private double getFirstNumberFromString(String timeControl) {
         double result = 0;
-        boolean isAllNumeric = true;
 
         for(int i = 0; i < timeControl.length(); i++) {
             char c = timeControl.charAt(i);
 
             if(!Character.isDigit(c)) {
-                isAllNumeric = false;
                 break;
             }
 
             result = result * 10 + Integer.parseInt(String.valueOf(c));
         }
 
-        if(isAllNumeric) return result / 60.0;
-        return result;
+        return result > 120 ? result / 60 : result;
     }
 
     public static double addAndRound(Double current, double change) {

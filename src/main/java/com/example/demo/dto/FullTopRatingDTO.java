@@ -10,7 +10,8 @@ import java.util.List;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class TopRatingDTOResponse {
+public class FullTopRatingDTO {
+    private Long rank;
     private Long fideId;
     private String name;
     private String country;
@@ -20,8 +21,9 @@ public class TopRatingDTOResponse {
     private Long count;
     private List<RecentGamesDTO> recentGames;
 
-    public static TopRatingDTOResponse from (TopRatingDTO dto, ObjectMapper mapper) throws JsonProcessingException {
-        TopRatingDTOResponse response = new TopRatingDTOResponse();
+    public static FullTopRatingDTO from (TopRatingDTO dto, ObjectMapper mapper) throws JsonProcessingException {
+        FullTopRatingDTO response = new FullTopRatingDTO();
+        response.setRank(dto.getRank());
         response.setFideId(dto.getFideId());
         response.setName(dto.getName());
         response.setCountry(dto.getCountry());

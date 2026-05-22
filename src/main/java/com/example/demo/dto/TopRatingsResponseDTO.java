@@ -8,7 +8,7 @@ import java.util.List;
 @Data
 @AllArgsConstructor
 public class TopRatingsResponseDTO {
-    public List<TopRatingDTOResponse> stdRatings;
-    public List<TopRatingDTOResponse> rapidRatings;
-    public List<TopRatingDTOResponse> blitzRatings;
+    public TopRatingResponseDTO stdRatings;
+    public TopRatingResponseDTO rapidRatings;
+    public TopRatingResponseDTO blitzRatings;
 }

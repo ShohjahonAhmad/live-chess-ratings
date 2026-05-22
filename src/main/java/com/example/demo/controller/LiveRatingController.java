@@ -1,14 +1,12 @@
 package com.example.demo.controller;
 
-import com.example.demo.dto.TopRatingDTO;
-import com.example.demo.dto.TopRatingDTOResponse;
+import com.example.demo.dto.TopRatingResponseDTO;
 import com.example.demo.dto.TopRatingsResponseDTO;
 import com.example.demo.service.LiveRatingCacheService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @RestController
 public class LiveRatingController {
@@ -22,28 +20,31 @@ public class LiveRatingController {
 
     @GetMapping("/top-ratings")
     public ResponseEntity<TopRatingsResponseDTO> getTopRatings() {
-        List<TopRatingDTOResponse> stdRatings = liveRatingCacheService.getTop300StdRatings();
-        List<TopRatingDTOResponse> rapidRatings = liveRatingCacheService.getTop300RapidRatings();
-        List<TopRatingDTOResponse> blitzRatings = liveRatingCacheService.getTop300BlitzRatings();
+        TopRatingResponseDTO stdRatings = liveRatingCacheService.findStdRatings(0, 100);
+        TopRatingResponseDTO rapidRatings = liveRatingCacheService.findRapidRatings(0, 100);
+        TopRatingResponseDTO blitzRatings = liveRatingCacheService.findBlitzRatings(0, 100);
         TopRatingsResponseDTO response = new TopRatingsResponseDTO(stdRatings, rapidRatings, blitzRatings);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/std-ratings")
-    public ResponseEntity<List<TopRatingDTOResponse>> getStdRatings() {
-        List<TopRatingDTOResponse> ratings = liveRatingCacheService.getTop300StdRatings();
-        return ResponseEntity.ok(ratings);
+    public ResponseEntity<TopRatingResponseDTO> getStdRatings(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size) {
+        return ResponseEntity.ok(liveRatingCacheService.findStdRatings(page, size));
     }
 
     @GetMapping("/rapid-ratings")
-    public ResponseEntity<List<TopRatingDTOResponse>> getRapidRatings() {
-        List<TopRatingDTOResponse> ratings = liveRatingCacheService.getTop300RapidRatings();
-        return ResponseEntity.ok(ratings);
+    public ResponseEntity<TopRatingResponseDTO> getRapidRatings(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size) {
+        return ResponseEntity.ok(liveRatingCacheService.findRapidRatings(page, size));
     }
 
     @GetMapping("/blitz-ratings")
-    public ResponseEntity<List<TopRatingDTOResponse>> getBlitzRatings() {
-        List<TopRatingDTOResponse> ratings = liveRatingCacheService.getTop300BlitzRatings();
-        return ResponseEntity.ok(ratings);
+    public ResponseEntity<TopRatingResponseDTO> getBlitzRatings(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size) {
+        return ResponseEntity.ok(liveRatingCacheService.findBlitzRatings(page, size));
     }
 }
