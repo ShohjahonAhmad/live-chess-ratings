@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Objects;
+
 @RestController
 public class LiveRatingController {
 
@@ -30,21 +32,31 @@ public class LiveRatingController {
     @GetMapping("/std-ratings")
     public ResponseEntity<TopRatingResponseDTO> getStdRatings(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "100") int size) {
+            @RequestParam(defaultValue = "100") int size,
+            @RequestParam(defaultValue = "ALL") String country) {
+        if(!Objects.equals(country, "ALL"))
+            return ResponseEntity.ok(liveRatingCacheService.findStdRatingsByCountry(country, page, size));
         return ResponseEntity.ok(liveRatingCacheService.findStdRatings(page, size));
     }
 
     @GetMapping("/rapid-ratings")
     public ResponseEntity<TopRatingResponseDTO> getRapidRatings(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "100") int size) {
+            @RequestParam(defaultValue = "100") int size,
+            @RequestParam(defaultValue = "ALL") String country
+    ) {
+        if(!Objects.equals(country, "ALL"))
+            return ResponseEntity.ok(liveRatingCacheService.findRapidRatingsByCountry(country, page, size));
         return ResponseEntity.ok(liveRatingCacheService.findRapidRatings(page, size));
     }
 
     @GetMapping("/blitz-ratings")
     public ResponseEntity<TopRatingResponseDTO> getBlitzRatings(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "100") int size) {
+            @RequestParam(defaultValue = "100") int size,
+            @RequestParam(defaultValue = "ALL") String country) {
+        if(!Objects.equals(country, "ALL"))
+            return ResponseEntity.ok(liveRatingCacheService.findBlitzRatingsByCountry(country, page, size));
         return ResponseEntity.ok(liveRatingCacheService.findBlitzRatings(page, size));
     }
 }

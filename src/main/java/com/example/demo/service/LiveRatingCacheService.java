@@ -81,4 +81,34 @@ public class LiveRatingCacheService {
 
         return new TopRatingResponseDTO(cachedBlitz.subList(from, to), total);
     }
+
+    public TopRatingResponseDTO findStdRatingsByCountry(String country, int page, int size) {
+        return getRatingsByCountry(cachedStd, country, page, size);
+    }
+
+    public TopRatingResponseDTO findRapidRatingsByCountry(String country, int page, int size) {
+        return getRatingsByCountry(cachedRapid, country, page, size);
+    }
+
+    public TopRatingResponseDTO findBlitzRatingsByCountry(String country, int page, int size) {
+        return getRatingsByCountry(cachedBlitz, country, page, size);
+    }
+
+    private TopRatingResponseDTO getRatingsByCountry(List<FullTopRatingDTO> cache, String country, int page, int size){
+        List<FullTopRatingDTO> filtered = new ArrayList<>();
+        int rank = 1;
+        for(FullTopRatingDTO dto : cache){
+            if(dto.getCountry().equalsIgnoreCase(country)){
+                FullTopRatingDTO copy = new FullTopRatingDTO(dto);
+                copy.setRank((long) rank++);
+                filtered.add(copy);
+            }
+        }
+
+        int total = filtered.size();
+        int from = Math.min(page * size, total);
+        int to = Math.min(from + size, total);
+
+        return new TopRatingResponseDTO(from >= total ? List.of() : filtered.subList(from, to), filtered.size());
+    }
 }
