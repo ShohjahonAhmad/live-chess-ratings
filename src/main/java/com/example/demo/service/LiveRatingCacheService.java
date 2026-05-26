@@ -14,7 +14,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class LiveRatingCacheService {
@@ -58,19 +60,19 @@ public class LiveRatingCacheService {
     }
 
 
-    public TopRatingResponseDTO findStdRatings(int page, int size, String nameOrId) {
-        return findBySearch(cachedStd, page, size, nameOrId);
+    public TopRatingResponseDTO findStdRatings(int page, int size, String nameOrId, String sortBy, String dir) {
+        return findBySearch(cachedStd, page, size, nameOrId, sortBy, dir);
     }
 
-    public TopRatingResponseDTO findRapidRatings(int page, int size, String nameOrId) {
-        return findBySearch(cachedRapid, page, size, nameOrId);
+    public TopRatingResponseDTO findRapidRatings(int page, int size, String nameOrId, String sortBy, String dir) {
+        return findBySearch(cachedRapid, page, size, nameOrId, sortBy, dir);
     }
 
-    public TopRatingResponseDTO findBlitzRatings(int page, int size, String nameOrId) {
-        return findBySearch(cachedBlitz, page, size, nameOrId);
+    public TopRatingResponseDTO findBlitzRatings(int page, int size, String nameOrId, String sortBy, String dir) {
+        return findBySearch(cachedBlitz, page, size, nameOrId, sortBy, dir);
     }
 
-    public TopRatingResponseDTO findBySearch(List<FullTopRatingDTO> cache, int page, int size, String nameOrId){
+    public TopRatingResponseDTO findBySearch(List<FullTopRatingDTO> cache, int page, int size, String nameOrId, String sortBy, String dir){
         List<FullTopRatingDTO> content = new ArrayList<>();
 
         if(nameOrId != null && !nameOrId.isBlank()){
@@ -83,8 +85,50 @@ public class LiveRatingCacheService {
                 }
             }
         } else {
-            content = cache;
+            content = new ArrayList<>(cache);
         }
+
+        if(!(Objects.equals(sortBy, "rating") && Objects.equals(dir, "desc"))){
+            content.sort((a, b) -> {
+                if(Objects.equals(sortBy, "rating")){
+                    double ratingA = a.getRating() == null ? 0 : a.getRating();
+                    double ratingB = b.getRating() == null ? 0 : b.getRating();
+                    if(Objects.equals(dir, "asc")){
+                        return Double.compare(ratingA, ratingB);
+                    }
+                } else if(Objects.equals(sortBy, "ratingChange")){
+                    double ratingChangeA = a.getRatingChange() == null ? 0 : a.getRatingChange();
+                    double ratingChangeB = b.getRatingChange() == null ? 0 : b.getRatingChange();
+                    if(Objects.equals(dir, "asc")){
+                        return Double.compare(ratingChangeA, ratingChangeB);
+                    } else {
+                        return Double.compare(ratingChangeB, ratingChangeA);
+                    }
+                } else if (Objects.equals(sortBy, "year")) {
+                    short yearA = a.getYear();
+                    short yearB = b.getYear();
+                    if(yearA == 0 && yearB == 0) return 0;
+                    if(yearA == 0) return 1;
+                    if(yearB == 0) return -1;
+
+                    if(Objects.equals(dir, "asc")){
+                        return Short.compare(yearA, yearB);
+                    } else {
+                        return Short.compare(yearB, yearA);
+                    }
+                } else if (Objects.equals(sortBy, "count")) {
+                    long countA = a.getCount() == null ? 0 : a.getCount();
+                    long countB = b.getCount() == null ? 0 : b.getCount();
+                    if(Objects.equals(dir, "asc")){
+                        return Long.compare(countA, countB);
+                    } else {
+                        return Long.compare(countB, countA);
+                    }
+                }
+                return 0;
+            });
+        }
+
 
         int total = content.size();
         int from = Math.min(page * size, total);
@@ -93,19 +137,19 @@ public class LiveRatingCacheService {
         return new TopRatingResponseDTO(from >= total ? List.of() : content.subList(from, to), content.size());
     }
 
-    public TopRatingResponseDTO findStdRatingsByCountry(String country, int page, int size, String nameOrFideId) {
-        return getRatingsByCountry(cachedStd, country, page, size, nameOrFideId);
+    public TopRatingResponseDTO findStdRatingsByCountry(String country, int page, int size, String nameOrFideId, String sortBy, String dir) {
+        return getRatingsByCountry(cachedStd, country, page, size, nameOrFideId, sortBy, dir);
     }
 
-    public TopRatingResponseDTO findRapidRatingsByCountry(String country, int page, int size, String nameOrFideId) {
-        return getRatingsByCountry(cachedRapid, country, page, size, nameOrFideId);
+    public TopRatingResponseDTO findRapidRatingsByCountry(String country, int page, int size, String nameOrFideId, String sortBy, String dir) {
+        return getRatingsByCountry(cachedRapid, country, page, size, nameOrFideId, sortBy, dir);
     }
 
-    public TopRatingResponseDTO findBlitzRatingsByCountry(String country, int page, int size, String nameOrFideId) {
-        return getRatingsByCountry(cachedBlitz, country, page, size, nameOrFideId);
+    public TopRatingResponseDTO findBlitzRatingsByCountry(String country, int page, int size, String nameOrFideId, String sortBy, String dir) {
+        return getRatingsByCountry(cachedBlitz, country, page, size, nameOrFideId, sortBy, dir);
     }
 
-    private TopRatingResponseDTO getRatingsByCountry(List<FullTopRatingDTO> cache, String country, int page, int size, String nameOrFideId){
+    private TopRatingResponseDTO getRatingsByCountry(List<FullTopRatingDTO> cache, String country, int page, int size, String nameOrFideId, String sortBy, String dir){
         List<FullTopRatingDTO> filtered = new ArrayList<>();
         int rank = 1;
         for(FullTopRatingDTO dto : cache){
@@ -122,6 +166,51 @@ public class LiveRatingCacheService {
                     }
                 }
             }
+        }
+
+        Comparator<Short> comparator =
+                Comparator.nullsLast(Short::compareTo);
+
+        if(!(Objects.equals(sortBy, "rating") && Objects.equals(dir, "desc"))){
+            filtered.sort((a, b) -> {
+                if(Objects.equals(sortBy, "rating")){
+                    double ratingA = a.getRating() == null ? 0 : a.getRating();
+                    double ratingB = b.getRating() == null ? 0 : b.getRating();
+                    if(Objects.equals(dir, "asc")){
+                        return Double.compare(ratingA, ratingB);
+                    }
+                } else if(Objects.equals(sortBy, "ratingChange")){
+                    double ratingChangeA = a.getRatingChange() == null ? 0 : a.getRatingChange();
+                    double ratingChangeB = b.getRatingChange() == null ? 0 : b.getRatingChange();
+                    if(Objects.equals(dir, "asc")){
+                        return Double.compare(ratingChangeA, ratingChangeB);
+                    } else {
+                        return Double.compare(ratingChangeB, ratingChangeA);
+                    }
+                } else if (Objects.equals(sortBy, "year")) {
+                    short yearA = a.getYear();
+                    short yearB = b.getYear();
+
+                    if(yearA == 0 && yearB == 0) return 0;
+                    if(yearA == 0) return 1;
+                    if(yearB == 0) return -1;
+
+                    if(Objects.equals(dir, "asc")){
+                        return Short.compare(yearA, yearB);
+                    } else {
+                        return Short.compare(yearB, yearA);
+                    }
+                } else if (Objects.equals(sortBy, "count")) {
+                    long countA = a.getCount() == null ? 0 : a.getCount();
+                    long countB = b.getCount() == null ? 0 : b.getCount();
+                    if(Objects.equals(dir, "asc")){
+                        return Long.compare(countA, countB);
+                    } else {
+                        return Long.compare(countB, countA);
+                    }
+                }
+                return 0;
+            });
         }
 
         int total = filtered.size();

@@ -13,6 +13,8 @@ import java.util.Objects;
 @RestController
 public class LiveRatingController {
     private static final String DEFAULT_SEARCH = "";
+    private static final String DEFAULT_SORTING = "rating";
+    private static final String DEFAULT_SORT_DIR = "desc";
     private final LiveRatingCacheService liveRatingCacheService;
 
 
@@ -22,9 +24,9 @@ public class LiveRatingController {
 
     @GetMapping("/top-ratings")
     public ResponseEntity<TopRatingsResponseDTO> getTopRatings() {
-        TopRatingResponseDTO stdRatings = liveRatingCacheService.findStdRatings(0, 100, DEFAULT_SEARCH);
-        TopRatingResponseDTO rapidRatings = liveRatingCacheService.findRapidRatings(0, 100, DEFAULT_SEARCH);
-        TopRatingResponseDTO blitzRatings = liveRatingCacheService.findBlitzRatings(0, 100, DEFAULT_SEARCH);
+        TopRatingResponseDTO stdRatings = liveRatingCacheService.findStdRatings(0, 100, DEFAULT_SEARCH, DEFAULT_SORTING, DEFAULT_SORT_DIR);
+        TopRatingResponseDTO rapidRatings = liveRatingCacheService.findRapidRatings(0, 100, DEFAULT_SEARCH, DEFAULT_SORTING, DEFAULT_SORT_DIR);
+        TopRatingResponseDTO blitzRatings = liveRatingCacheService.findBlitzRatings(0, 100, DEFAULT_SEARCH, DEFAULT_SORTING, DEFAULT_SORT_DIR);
         TopRatingsResponseDTO response = new TopRatingsResponseDTO(stdRatings, rapidRatings, blitzRatings);
         return ResponseEntity.ok(response);
     }
@@ -34,10 +36,12 @@ public class LiveRatingController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size,
             @RequestParam(defaultValue = "ALL") String country,
-            @RequestParam(defaultValue = "") String search) {
+            @RequestParam(defaultValue = "") String search,
+            @RequestParam(defaultValue = "rating") String sort,
+            @RequestParam(defaultValue = "desc") String dir){
         if(!Objects.equals(country, "ALL"))
-            return ResponseEntity.ok(liveRatingCacheService.findStdRatingsByCountry(country, page, size, search));
-        return ResponseEntity.ok(liveRatingCacheService.findStdRatings(page, size, search));
+            return ResponseEntity.ok(liveRatingCacheService.findStdRatingsByCountry(country, page, size, search, sort, dir));
+        return ResponseEntity.ok(liveRatingCacheService.findStdRatings(page, size, search, sort, dir));
     }
 
     @GetMapping("/rapid-ratings")
@@ -45,11 +49,13 @@ public class LiveRatingController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size,
             @RequestParam(defaultValue = "ALL") String country,
-            @RequestParam(defaultValue = "") String search
+            @RequestParam(defaultValue = "") String search,
+            @RequestParam(defaultValue = "rating") String sort,
+            @RequestParam(defaultValue = "desc") String dir
     ) {
         if(!Objects.equals(country, "ALL"))
-            return ResponseEntity.ok(liveRatingCacheService.findRapidRatingsByCountry(country, page, size, search));
-        return ResponseEntity.ok(liveRatingCacheService.findRapidRatings(page, size, search));
+            return ResponseEntity.ok(liveRatingCacheService.findRapidRatingsByCountry(country, page, size, search, sort, dir));
+        return ResponseEntity.ok(liveRatingCacheService.findRapidRatings(page, size, search, sort, dir));
     }
 
     @GetMapping("/blitz-ratings")
@@ -57,9 +63,11 @@ public class LiveRatingController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size,
             @RequestParam(defaultValue = "ALL") String country,
-            @RequestParam(defaultValue = "") String search) {
+            @RequestParam(defaultValue = "") String search,
+            @RequestParam(defaultValue = "rating") String sort,
+            @RequestParam(defaultValue = "desc") String dir) {
         if(!Objects.equals(country, "ALL"))
-            return ResponseEntity.ok(liveRatingCacheService.findBlitzRatingsByCountry(country, page, size, search));
-        return ResponseEntity.ok(liveRatingCacheService.findBlitzRatings(page, size, search));
+            return ResponseEntity.ok(liveRatingCacheService.findBlitzRatingsByCountry(country, page, size, search, sort, dir));
+        return ResponseEntity.ok(liveRatingCacheService.findBlitzRatings(page, size, search, sort, dir));
     }
 }
