@@ -4,6 +4,8 @@ import com.example.demo.dto.TopRatingDTO;
 import com.example.demo.dto.FullTopRatingDTO;
 import com.example.demo.dto.TopRatingResponseDTO;
 import com.example.demo.repository.LiveRatingRepository;
+import com.example.demo.utils.SortBy;
+import com.example.demo.utils.SortDirection;
 import com.example.demo.utils.TimeControl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,7 +16,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
@@ -60,19 +61,19 @@ public class LiveRatingCacheService {
     }
 
 
-    public TopRatingResponseDTO findStdRatings(int page, int size, String nameOrId, String sortBy, String dir) {
+    public TopRatingResponseDTO findStdRatings(int page, int size, String nameOrId, SortBy sortBy, SortDirection dir) {
         return findBySearch(cachedStd, page, size, nameOrId, sortBy, dir);
     }
 
-    public TopRatingResponseDTO findRapidRatings(int page, int size, String nameOrId, String sortBy, String dir) {
+    public TopRatingResponseDTO findRapidRatings(int page, int size, String nameOrId, SortBy sortBy, SortDirection dir) {
         return findBySearch(cachedRapid, page, size, nameOrId, sortBy, dir);
     }
 
-    public TopRatingResponseDTO findBlitzRatings(int page, int size, String nameOrId, String sortBy, String dir) {
+    public TopRatingResponseDTO findBlitzRatings(int page, int size, String nameOrId, SortBy sortBy, SortDirection dir) {
         return findBySearch(cachedBlitz, page, size, nameOrId, sortBy, dir);
     }
 
-    public TopRatingResponseDTO findBySearch(List<FullTopRatingDTO> cache, int page, int size, String nameOrId, String sortBy, String dir){
+    public TopRatingResponseDTO findBySearch(List<FullTopRatingDTO> cache, int page, int size, String nameOrId, SortBy sortBy, SortDirection dir){
         List<FullTopRatingDTO> content = new ArrayList<>();
 
         if(nameOrId != null && !nameOrId.isBlank()){
@@ -88,47 +89,7 @@ public class LiveRatingCacheService {
             content = new ArrayList<>(cache);
         }
 
-        if(!(Objects.equals(sortBy, "rating") && Objects.equals(dir, "desc"))){
-            content.sort((a, b) -> {
-                if(Objects.equals(sortBy, "rating")){
-                    double ratingA = a.getRating() == null ? 0 : a.getRating();
-                    double ratingB = b.getRating() == null ? 0 : b.getRating();
-                    if(Objects.equals(dir, "asc")){
-                        return Double.compare(ratingA, ratingB);
-                    }
-                } else if(Objects.equals(sortBy, "ratingChange")){
-                    double ratingChangeA = a.getRatingChange() == null ? 0 : a.getRatingChange();
-                    double ratingChangeB = b.getRatingChange() == null ? 0 : b.getRatingChange();
-                    if(Objects.equals(dir, "asc")){
-                        return Double.compare(ratingChangeA, ratingChangeB);
-                    } else {
-                        return Double.compare(ratingChangeB, ratingChangeA);
-                    }
-                } else if (Objects.equals(sortBy, "year")) {
-                    short yearA = a.getYear();
-                    short yearB = b.getYear();
-                    if(yearA == 0 && yearB == 0) return 0;
-                    if(yearA == 0) return 1;
-                    if(yearB == 0) return -1;
-
-                    if(Objects.equals(dir, "asc")){
-                        return Short.compare(yearA, yearB);
-                    } else {
-                        return Short.compare(yearB, yearA);
-                    }
-                } else if (Objects.equals(sortBy, "count")) {
-                    long countA = a.getCount() == null ? 0 : a.getCount();
-                    long countB = b.getCount() == null ? 0 : b.getCount();
-                    if(Objects.equals(dir, "asc")){
-                        return Long.compare(countA, countB);
-                    } else {
-                        return Long.compare(countB, countA);
-                    }
-                }
-                return 0;
-            });
-        }
-
+        sort(content, sortBy, dir);
 
         int total = content.size();
         int from = Math.min(page * size, total);
@@ -137,19 +98,65 @@ public class LiveRatingCacheService {
         return new TopRatingResponseDTO(from >= total ? List.of() : content.subList(from, to), content.size());
     }
 
-    public TopRatingResponseDTO findStdRatingsByCountry(String country, int page, int size, String nameOrFideId, String sortBy, String dir) {
+    private void sort(List<FullTopRatingDTO> content, SortBy sortBy, SortDirection dir) {
+        switch (sortBy) {
+            case RATING -> {
+                if (Objects.requireNonNull(dir) == SortDirection.ASC) {
+                    content.sort((a, b) -> {
+                        double ratingA = a.getRating() == null ? 0 : a.getRating();
+                        double ratingB = b.getRating() == null ? 0 : b.getRating();
+                        return Double.compare(ratingA, ratingB);
+                    });
+                }
+                // DESC uses natural cache order
+            }
+            case YEAR ->
+                    content.sort((a, b) -> {
+                        short yearA = a.getYear() == null ? 0 : a.getYear();
+                        short yearB = b.getYear() == null ? 0 : b.getYear();
+                        if (yearA == 0 && yearB == 0) return 0;
+                        if (yearA == 0) return 1;
+                        if (yearB == 0) return -1;
+
+                        return switch (dir) {
+                            case ASC -> Short.compare(yearA, yearB);
+                            case DESC -> Short.compare(yearB, yearA);
+                        };
+                    });
+            case RATING_CHANGE ->
+                    content.sort((a, b) -> {
+                        double ratingChangeA = a.getRatingChange() == null ? 0 : a.getRatingChange();
+                        double ratingChangeB = b.getRatingChange() == null ? 0 : b.getRatingChange();
+                        return switch (dir) {
+                            case ASC -> Double.compare(ratingChangeA, ratingChangeB);
+                            case DESC -> Double.compare(ratingChangeB, ratingChangeA);
+                        };
+                    });
+            case COUNT ->
+                    content.sort((a, b) -> {
+                        long countA = a.getCount() == null ? 0 : a.getCount();
+                        long countB = b.getCount() == null ? 0 : b.getCount();
+                        return switch (dir) {
+                            case ASC -> Long.compare(countA, countB);
+                            case DESC -> Long.compare(countB, countA);
+                        };
+                    });
+        }
+    }
+
+    public TopRatingResponseDTO findStdRatingsByCountry(String country, int page, int size, String nameOrFideId, SortBy sortBy, SortDirection dir) {
         return getRatingsByCountry(cachedStd, country, page, size, nameOrFideId, sortBy, dir);
     }
 
-    public TopRatingResponseDTO findRapidRatingsByCountry(String country, int page, int size, String nameOrFideId, String sortBy, String dir) {
+    public TopRatingResponseDTO findRapidRatingsByCountry(String country, int page, int size, String nameOrFideId, SortBy sortBy, SortDirection dir) {
         return getRatingsByCountry(cachedRapid, country, page, size, nameOrFideId, sortBy, dir);
     }
 
-    public TopRatingResponseDTO findBlitzRatingsByCountry(String country, int page, int size, String nameOrFideId, String sortBy, String dir) {
+    public TopRatingResponseDTO findBlitzRatingsByCountry(String country, int page, int size, String nameOrFideId, SortBy sortBy, SortDirection dir) {
         return getRatingsByCountry(cachedBlitz, country, page, size, nameOrFideId, sortBy, dir);
     }
 
-    private TopRatingResponseDTO getRatingsByCountry(List<FullTopRatingDTO> cache, String country, int page, int size, String nameOrFideId, String sortBy, String dir){
+    private TopRatingResponseDTO getRatingsByCountry(List<FullTopRatingDTO> cache, String country, int page, int size, String nameOrFideId, SortBy sortBy, SortDirection dir){
         List<FullTopRatingDTO> filtered = new ArrayList<>();
         int rank = 1;
         for(FullTopRatingDTO dto : cache){
@@ -168,50 +175,7 @@ public class LiveRatingCacheService {
             }
         }
 
-        Comparator<Short> comparator =
-                Comparator.nullsLast(Short::compareTo);
-
-        if(!(Objects.equals(sortBy, "rating") && Objects.equals(dir, "desc"))){
-            filtered.sort((a, b) -> {
-                if(Objects.equals(sortBy, "rating")){
-                    double ratingA = a.getRating() == null ? 0 : a.getRating();
-                    double ratingB = b.getRating() == null ? 0 : b.getRating();
-                    if(Objects.equals(dir, "asc")){
-                        return Double.compare(ratingA, ratingB);
-                    }
-                } else if(Objects.equals(sortBy, "ratingChange")){
-                    double ratingChangeA = a.getRatingChange() == null ? 0 : a.getRatingChange();
-                    double ratingChangeB = b.getRatingChange() == null ? 0 : b.getRatingChange();
-                    if(Objects.equals(dir, "asc")){
-                        return Double.compare(ratingChangeA, ratingChangeB);
-                    } else {
-                        return Double.compare(ratingChangeB, ratingChangeA);
-                    }
-                } else if (Objects.equals(sortBy, "year")) {
-                    short yearA = a.getYear();
-                    short yearB = b.getYear();
-
-                    if(yearA == 0 && yearB == 0) return 0;
-                    if(yearA == 0) return 1;
-                    if(yearB == 0) return -1;
-
-                    if(Objects.equals(dir, "asc")){
-                        return Short.compare(yearA, yearB);
-                    } else {
-                        return Short.compare(yearB, yearA);
-                    }
-                } else if (Objects.equals(sortBy, "count")) {
-                    long countA = a.getCount() == null ? 0 : a.getCount();
-                    long countB = b.getCount() == null ? 0 : b.getCount();
-                    if(Objects.equals(dir, "asc")){
-                        return Long.compare(countA, countB);
-                    } else {
-                        return Long.compare(countB, countA);
-                    }
-                }
-                return 0;
-            });
-        }
+        sort(filtered, sortBy, dir);
 
         int total = filtered.size();
         int from = Math.min(page * size, total);

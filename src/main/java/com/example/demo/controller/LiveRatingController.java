@@ -3,6 +3,8 @@ package com.example.demo.controller;
 import com.example.demo.dto.TopRatingResponseDTO;
 import com.example.demo.dto.TopRatingsResponseDTO;
 import com.example.demo.service.LiveRatingCacheService;
+import com.example.demo.utils.SortBy;
+import com.example.demo.utils.SortDirection;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -13,8 +15,8 @@ import java.util.Objects;
 @RestController
 public class LiveRatingController {
     private static final String DEFAULT_SEARCH = "";
-    private static final String DEFAULT_SORTING = "rating";
-    private static final String DEFAULT_SORT_DIR = "desc";
+    private static final SortBy DEFAULT_SORTING = SortBy.RATING;
+    private static final SortDirection DEFAULT_SORT_DIR = SortDirection.DESC;
     private final LiveRatingCacheService liveRatingCacheService;
 
 
@@ -39,9 +41,27 @@ public class LiveRatingController {
             @RequestParam(defaultValue = "") String search,
             @RequestParam(defaultValue = "rating") String sort,
             @RequestParam(defaultValue = "desc") String dir){
+        SortBy sortBy = validateSort(sort);
+        SortDirection direction = validateSortDirection(dir);
         if(!Objects.equals(country, "ALL"))
-            return ResponseEntity.ok(liveRatingCacheService.findStdRatingsByCountry(country, page, size, search, sort, dir));
-        return ResponseEntity.ok(liveRatingCacheService.findStdRatings(page, size, search, sort, dir));
+            return ResponseEntity.ok(liveRatingCacheService.findStdRatingsByCountry(country, page, size, search, sortBy, direction));
+        return ResponseEntity.ok(liveRatingCacheService.findStdRatings(page, size, search, sortBy, direction));
+    }
+
+    private SortBy validateSort(String sort) {
+        try {
+            return SortBy.valueOf(sort);
+        } catch (Exception _) {
+            return SortBy.RATING;
+        }
+    }
+
+    private SortDirection validateSortDirection(String dir) {
+        try {
+            return SortDirection.valueOf(dir);
+        } catch (Exception _) {
+            return SortDirection.DESC;
+        }
     }
 
     @GetMapping("/rapid-ratings")
@@ -53,9 +73,11 @@ public class LiveRatingController {
             @RequestParam(defaultValue = "rating") String sort,
             @RequestParam(defaultValue = "desc") String dir
     ) {
+        SortBy sortBy = validateSort(sort);
+        SortDirection direction = validateSortDirection(dir);
         if(!Objects.equals(country, "ALL"))
-            return ResponseEntity.ok(liveRatingCacheService.findRapidRatingsByCountry(country, page, size, search, sort, dir));
-        return ResponseEntity.ok(liveRatingCacheService.findRapidRatings(page, size, search, sort, dir));
+            return ResponseEntity.ok(liveRatingCacheService.findRapidRatingsByCountry(country, page, size, search, sortBy, direction));
+        return ResponseEntity.ok(liveRatingCacheService.findRapidRatings(page, size, search, sortBy, direction));
     }
 
     @GetMapping("/blitz-ratings")
@@ -66,8 +88,10 @@ public class LiveRatingController {
             @RequestParam(defaultValue = "") String search,
             @RequestParam(defaultValue = "rating") String sort,
             @RequestParam(defaultValue = "desc") String dir) {
+        SortBy sortBy = validateSort(sort);
+        SortDirection direction = validateSortDirection(dir);
         if(!Objects.equals(country, "ALL"))
-            return ResponseEntity.ok(liveRatingCacheService.findBlitzRatingsByCountry(country, page, size, search, sort, dir));
-        return ResponseEntity.ok(liveRatingCacheService.findBlitzRatings(page, size, search, sort, dir));
+            return ResponseEntity.ok(liveRatingCacheService.findBlitzRatingsByCountry(country, page, size, search, sortBy, direction));
+        return ResponseEntity.ok(liveRatingCacheService.findBlitzRatings(page, size, search, sortBy, direction));
     }
 }
