@@ -4,6 +4,7 @@ logs/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+chess_backup.sql
 
 ### STS ###
 .apt_generated
