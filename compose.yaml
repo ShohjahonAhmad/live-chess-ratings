@@ -13,7 +13,7 @@ services:
     volumes:
       - live-chess-ratings_postgres_data:/var/lib/postgresql/data
   backend:
-    image: 'live-chess-ratings:latest'
+    image: '777peaceful777/live-chess-ratings:latest'
     container_name: chess-backend
     restart: unless-stopped
     depends_on:

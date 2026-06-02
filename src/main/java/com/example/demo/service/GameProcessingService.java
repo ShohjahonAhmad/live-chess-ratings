@@ -4,6 +4,7 @@ import com.example.demo.entity.*;
 import com.example.demo.repository.GameRepository;
 import com.example.demo.repository.LiveRatingRepository;
 import com.example.demo.repository.PlayerRepository;
+import com.example.demo.repository.RatingRepository;
 import com.example.demo.utils.EloCalculator;
 import com.example.demo.utils.Result;
 import com.example.demo.utils.TimeControl;
@@ -12,9 +13,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.sql.Time;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -35,12 +38,14 @@ public class GameProcessingService {
 
     private final GameRepository gameRepository;
     private final PlayerRepository playerRepository;
+    private final RatingRepository ratingRepository;
     private final LiveRatingRepository liveRatingRepository;
 
 
-    public GameProcessingService(GameRepository gameRepository, PlayerRepository playerRepository, LiveRatingRepository liveRatingRepository) {
+    public GameProcessingService(GameRepository gameRepository, PlayerRepository playerRepository, RatingRepository ratingRepository, LiveRatingRepository liveRatingRepository) {
         this.gameRepository = gameRepository;
         this.playerRepository = playerRepository;
+        this.ratingRepository = ratingRepository;
         this.liveRatingRepository = liveRatingRepository;
     }
 
@@ -59,6 +64,32 @@ public class GameProcessingService {
         Player whitePlayer = getPlayer(game.getWhiteFideId());
         Player blackPlayer = getPlayer(game.getBlackFideId());
 
+        TimeControl white = null;
+        TimeControl black = null;
+
+        if(game.getWhiteRating() != null && whitePlayer != null) {
+            Rating rating = ratingRepository.findById(whitePlayer.getFideId()).orElse(null);
+            white = resolveTimeControlBasedOnRatings(game, rating);
+        }
+
+        if(game.getBlackRating() != null && blackPlayer != null){
+            Rating rating = ratingRepository.findById(blackPlayer.getFideId()).orElse(null);
+            black = resolveTimeControlBasedOnRatings(game, rating);
+        }
+
+        if(white != null && black == null){
+            game.setTimeControl(white);
+        } else if(white == null && black != null){
+            game.setTimeControl(black);
+        } else if(white == black) {
+            game.setTimeControl(white);
+        }
+
+        if(game.getTimeControl() == null){
+            String timeControl = extractMatch(pgn, TIME_CONTROL_PATTERN, 1);
+            game.setTimeControl(resolveTimeControl(timeControl, tournament));
+        }
+
         setGameUnknownPlayerName(pgn, game, whitePlayer, blackPlayer);
 
         if(areBothPlayersNull(whitePlayer, blackPlayer)) {
@@ -76,6 +107,20 @@ public class GameProcessingService {
 
         gameRepository.save(game);
         logger.debug("Game {} saved: {} vs {} - Result: {}", game.getId(), game.getWhiteFideId(), game.getBlackFideId(), game.getResult());
+    }
+
+    private TimeControl resolveTimeControlBasedOnRatings(Game game, Rating rating) {
+        if(rating != null) {
+            if(Objects.equals(rating.getStdRating(), game.getWhiteRating()) && !Objects.equals(rating.getBlitzRating(), game.getWhiteRating()) && !Objects.equals(rating.getRapidRating(), game.getWhiteRating())){
+                return TimeControl.STD;
+            } else if(Objects.equals(rating.getRapidRating(), game.getWhiteRating()) && !Objects.equals(rating.getBlitzRating(), game.getWhiteRating()) && !Objects.equals(rating.getStdRating(), game.getWhiteRating())){
+                return TimeControl.RAPID;
+            } else if(Objects.equals(rating.getBlitzRating(), game.getWhiteRating()) && !Objects.equals(rating.getRapidRating(), game.getWhiteRating()) && !Objects.equals(rating.getStdRating(), game.getWhiteRating())){
+                return TimeControl.BLITZ;
+            }
+        }
+
+        return null;
     }
 
     private void setGameUnknownPlayerName(String pgn, Game game, Player whitePlayer, Player blackPlayer) {
@@ -137,10 +182,6 @@ public class GameProcessingService {
         short blackRating = Short.parseShort(blackRatingPgn != null ? blackRatingPgn : "0");
         game.setBlackRating(blackRating);
 
-        String timeControl = extractMatch(pgn, TIME_CONTROL_PATTERN, 1);
-        game.setTimeControl(resolveTimeControl(timeControl, tournament));
-
-
         return game;
     }
 
@@ -150,6 +191,7 @@ public class GameProcessingService {
 
     private TimeControl resolveTimeControl (String timeControl, Tournament tournament) {
         TimeControl tcType = TimeControl.STD;
+
         if (timeControl != null) {
             try {
                 double timeValue = getFirstNumberFromString(timeControl.trim());
