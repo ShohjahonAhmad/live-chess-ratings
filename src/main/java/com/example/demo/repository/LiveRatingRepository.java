@@ -13,6 +13,43 @@ import java.util.List;
 @Repository
 public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
     String topStdQuery = """
+                WITH player_games AS (
+                    SELECT
+                        white_fide_id AS fide_id,
+                        id,
+                        date,
+                        result,
+                        round_id,
+                        created_at,
+                        white_fide_id,
+                        black_fide_id,
+                        white_rating,
+                        black_rating,
+                        white_rating_change,
+                        black_rating_change,
+                        unknown_player_name
+                    FROM games
+                    WHERE time_control = 'STD'
+            
+                    UNION ALL
+            
+                    SELECT
+                        black_fide_id AS fide_id,
+                        id,
+                        date,
+                        result,
+                        round_id,
+                        created_at,
+                        white_fide_id,
+                        black_fide_id,
+                        white_rating,
+                        black_rating,
+                        white_rating_change,
+                        black_rating_change,
+                        unknown_player_name
+                    FROM games
+                    WHERE time_control = 'STD'
+                )
                 SELECT
                     ROW_NUMBER() OVER (ORDER BY l.std_rating DESC) AS "rank",
                     p.fide_id, p.name, p.country, p.birthday,
@@ -35,8 +72,8 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
                     ) FILTER (WHERE g.id IS NOT NULL) AS "recentGames"
                 FROM live_ratings l
                 JOIN players p ON l.fide_id = p.fide_id
-                LEFT JOIN games g ON g.time_control = 'STD'
-                                  AND (g.black_fide_id = p.fide_id OR g.white_fide_id = p.fide_id)
+                LEFT JOIN player_games g
+                    ON g.fide_id = p.fide_id
                 LEFT JOIN rounds r ON g.round_id = r.id
                 LEFT JOIN tournaments t ON r.tournament_id = t.id
                 LEFT JOIN players wp ON g.white_fide_id = wp.fide_id
@@ -47,6 +84,43 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
             """;
 
     String topRapidQuery = """
+                WITH player_games AS (
+                    SELECT
+                        white_fide_id AS fide_id,
+                        id,
+                        date,
+                        result,
+                        round_id,
+                        created_at,
+                        white_fide_id,
+                        black_fide_id,
+                        white_rating,
+                        black_rating,
+                        white_rating_change,
+                        black_rating_change,
+                        unknown_player_name
+                    FROM games
+                    WHERE time_control = 'RAPID'
+            
+                    UNION ALL
+            
+                    SELECT
+                        black_fide_id AS fide_id,
+                        id,
+                        date,
+                        result,
+                        round_id,
+                        created_at,
+                        white_fide_id,
+                        black_fide_id,
+                        white_rating,
+                        black_rating,
+                        white_rating_change,
+                        black_rating_change,
+                        unknown_player_name
+                    FROM games
+                    WHERE time_control = 'RAPID'
+                )
                 SELECT
                     ROW_NUMBER() OVER (ORDER BY l.rapid_rating DESC) AS "rank",
                     p.fide_id, p.name, p.country, p.birthday,
@@ -69,8 +143,8 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
                     ) FILTER (WHERE g.id IS NOT NULL) AS "recentGames"
                 FROM live_ratings l
                 JOIN players p ON l.fide_id = p.fide_id
-                LEFT JOIN games g ON g.time_control = 'RAPID'
-                                  AND (g.black_fide_id = p.fide_id OR g.white_fide_id = p.fide_id)
+                LEFT JOIN player_games g
+                    ON g.fide_id = p.fide_id
                 LEFT JOIN rounds r ON g.round_id = r.id
                 LEFT JOIN tournaments t ON r.tournament_id = t.id
                 LEFT JOIN players wp ON g.white_fide_id = wp.fide_id
@@ -81,6 +155,43 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
             """;
 
     String topBlitzQuery = """
+                WITH player_games AS (
+                    SELECT
+                        white_fide_id AS fide_id,
+                        id,
+                        date,
+                        result,
+                        round_id,
+                        created_at,
+                        white_fide_id,
+                        black_fide_id,
+                        white_rating,
+                        black_rating,
+                        white_rating_change,
+                        black_rating_change,
+                        unknown_player_name
+                    FROM games
+                    WHERE time_control = 'BLITZ'
+            
+                    UNION ALL
+            
+                    SELECT
+                        black_fide_id AS fide_id,
+                        id,
+                        date,
+                        result,
+                        round_id,
+                        created_at,
+                        white_fide_id,
+                        black_fide_id,
+                        white_rating,
+                        black_rating,
+                        white_rating_change,
+                        black_rating_change,
+                        unknown_player_name
+                    FROM games
+                    WHERE time_control = 'BLITZ'
+                )
                 SELECT
                     ROW_NUMBER() OVER (ORDER BY l.blitz_rating DESC) AS "rank",
                     p.fide_id, p.name, p.country, p.birthday,
@@ -103,8 +214,8 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
                     ) FILTER (WHERE g.id IS NOT NULL) AS "recentGames"
                 FROM live_ratings l
                 JOIN players p ON l.fide_id = p.fide_id
-                LEFT JOIN games g ON g.time_control = 'BLITZ'
-                                  AND (g.black_fide_id = p.fide_id OR g.white_fide_id = p.fide_id)
+                LEFT JOIN player_games g
+                    ON g.fide_id = p.fide_id
                 LEFT JOIN rounds r ON g.round_id = r.id
                 LEFT JOIN tournaments t ON r.tournament_id = t.id
                 LEFT JOIN players wp ON g.white_fide_id = wp.fide_id
