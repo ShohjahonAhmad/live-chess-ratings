@@ -13,6 +13,7 @@ public class TopRatingDTO {
     public String name;
     public String country;
     public Short year;
+    public String flag;
     public Double rating;
     public Double ratingChange;
     public Long count;

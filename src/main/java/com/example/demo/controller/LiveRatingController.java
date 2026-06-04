@@ -17,6 +17,7 @@ public class LiveRatingController {
     private static final String DEFAULT_SEARCH = "";
     private static final SortBy DEFAULT_SORTING = SortBy.RATING;
     private static final SortDirection DEFAULT_SORT_DIR = SortDirection.DESC;
+    private static final boolean DEFAULT_ONLY_ACTIVE = true;
     private final LiveRatingCacheService liveRatingCacheService;
 
 
@@ -26,9 +27,9 @@ public class LiveRatingController {
 
     @GetMapping("/top-ratings")
     public ResponseEntity<TopRatingsResponseDTO> getTopRatings() {
-        TopRatingResponseDTO stdRatings = liveRatingCacheService.findStdRatings(0, 100, DEFAULT_SEARCH, DEFAULT_SORTING, DEFAULT_SORT_DIR);
-        TopRatingResponseDTO rapidRatings = liveRatingCacheService.findRapidRatings(0, 100, DEFAULT_SEARCH, DEFAULT_SORTING, DEFAULT_SORT_DIR);
-        TopRatingResponseDTO blitzRatings = liveRatingCacheService.findBlitzRatings(0, 100, DEFAULT_SEARCH, DEFAULT_SORTING, DEFAULT_SORT_DIR);
+        TopRatingResponseDTO stdRatings = liveRatingCacheService.findStdRatings(0, 100, DEFAULT_SEARCH, DEFAULT_SORTING, DEFAULT_SORT_DIR, DEFAULT_ONLY_ACTIVE);
+        TopRatingResponseDTO rapidRatings = liveRatingCacheService.findRapidRatings(0, 100, DEFAULT_SEARCH, DEFAULT_SORTING, DEFAULT_SORT_DIR, DEFAULT_ONLY_ACTIVE);
+        TopRatingResponseDTO blitzRatings = liveRatingCacheService.findBlitzRatings(0, 100, DEFAULT_SEARCH, DEFAULT_SORTING, DEFAULT_SORT_DIR, DEFAULT_ONLY_ACTIVE);
         TopRatingsResponseDTO response = new TopRatingsResponseDTO(stdRatings, rapidRatings, blitzRatings);
         return ResponseEntity.ok(response);
     }
@@ -40,12 +41,14 @@ public class LiveRatingController {
             @RequestParam(defaultValue = "ALL") String country,
             @RequestParam(defaultValue = "") String search,
             @RequestParam(defaultValue = "rating") String sort,
-            @RequestParam(defaultValue = "desc") String dir){
+            @RequestParam(defaultValue = "desc") String dir,
+            @RequestParam(defaultValue = "true") boolean onlyActive
+    ){
         SortBy sortBy = validateSort(sort);
         SortDirection direction = validateSortDirection(dir);
         if(!Objects.equals(country, "ALL"))
-            return ResponseEntity.ok(liveRatingCacheService.findStdRatingsByCountry(country, page, size, search, sortBy, direction));
-        return ResponseEntity.ok(liveRatingCacheService.findStdRatings(page, size, search, sortBy, direction));
+            return ResponseEntity.ok(liveRatingCacheService.findStdRatingsByCountry(country, page, size, search, sortBy, direction, onlyActive));
+        return ResponseEntity.ok(liveRatingCacheService.findStdRatings(page, size, search, sortBy, direction, onlyActive));
     }
 
     private SortBy validateSort(String sort) {
@@ -71,13 +74,14 @@ public class LiveRatingController {
             @RequestParam(defaultValue = "ALL") String country,
             @RequestParam(defaultValue = "") String search,
             @RequestParam(defaultValue = "rating") String sort,
-            @RequestParam(defaultValue = "desc") String dir
+            @RequestParam(defaultValue = "desc") String dir,
+            @RequestParam(defaultValue = "true") boolean onlyActive
     ) {
         SortBy sortBy = validateSort(sort);
         SortDirection direction = validateSortDirection(dir);
         if(!Objects.equals(country, "ALL"))
-            return ResponseEntity.ok(liveRatingCacheService.findRapidRatingsByCountry(country, page, size, search, sortBy, direction));
-        return ResponseEntity.ok(liveRatingCacheService.findRapidRatings(page, size, search, sortBy, direction));
+            return ResponseEntity.ok(liveRatingCacheService.findRapidRatingsByCountry(country, page, size, search, sortBy, direction, onlyActive));
+        return ResponseEntity.ok(liveRatingCacheService.findRapidRatings(page, size, search, sortBy, direction, onlyActive));
     }
 
     @GetMapping("/blitz-ratings")
@@ -87,11 +91,12 @@ public class LiveRatingController {
             @RequestParam(defaultValue = "ALL") String country,
             @RequestParam(defaultValue = "") String search,
             @RequestParam(defaultValue = "rating") String sort,
-            @RequestParam(defaultValue = "desc") String dir) {
+            @RequestParam(defaultValue = "desc") String dir,
+            @RequestParam(defaultValue = "true") boolean onlyActive) {
         SortBy sortBy = validateSort(sort);
         SortDirection direction = validateSortDirection(dir);
         if(!Objects.equals(country, "ALL"))
-            return ResponseEntity.ok(liveRatingCacheService.findBlitzRatingsByCountry(country, page, size, search, sortBy, direction));
-        return ResponseEntity.ok(liveRatingCacheService.findBlitzRatings(page, size, search, sortBy, direction));
+            return ResponseEntity.ok(liveRatingCacheService.findBlitzRatingsByCountry(country, page, size, search, sortBy, direction, onlyActive));
+        return ResponseEntity.ok(liveRatingCacheService.findBlitzRatings(page, size, search, sortBy, direction, onlyActive));
     }
 }

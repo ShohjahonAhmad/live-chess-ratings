@@ -52,7 +52,7 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
                 )
                 SELECT
                     ROW_NUMBER() OVER (ORDER BY l.std_rating DESC) AS "rank",
-                    p.fide_id, p.name, p.country, p.birthday,
+                    p.fide_id, p.name, p.country, p.birthday, p.flag,
                     l.std_rating AS "rating",
                     l.std_change AS "ratingChange",
                     COUNT(g.id) AS "count",
@@ -79,7 +79,6 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
                 LEFT JOIN players wp ON g.white_fide_id = wp.fide_id
                 LEFT JOIN players bp ON g.black_fide_id = bp.fide_id
                 GROUP BY p.fide_id, p.name, p.country, p.birthday, l.std_rating, l.std_change
-                HAVING p.flag = '' OR p.flag NOT IN ('i', 'wi') OR COUNT(g.id) > 0
                 ORDER BY l.std_rating DESC;
             """;
 
@@ -123,7 +122,7 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
                 )
                 SELECT
                     ROW_NUMBER() OVER (ORDER BY l.rapid_rating DESC) AS "rank",
-                    p.fide_id, p.name, p.country, p.birthday,
+                    p.fide_id, p.name, p.country, p.birthday, p.flag,
                     l.rapid_rating AS "rating",
                     l.rapid_change AS "ratingChange",
                     COUNT(g.id) AS "count",
@@ -150,7 +149,6 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
                 LEFT JOIN players wp ON g.white_fide_id = wp.fide_id
                 LEFT JOIN players bp ON g.black_fide_id = bp.fide_id
                 GROUP BY p.fide_id, p.name, p.country, p.birthday, l.rapid_rating, l.rapid_change
-                HAVING p.rapid_flag = '' OR p.rapid_flag NOT IN ('i', 'wi') OR COUNT(g.id) > 0
                 ORDER BY l.rapid_rating DESC;
             """;
 
@@ -194,7 +192,7 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
                 )
                 SELECT
                     ROW_NUMBER() OVER (ORDER BY l.blitz_rating DESC) AS "rank",
-                    p.fide_id, p.name, p.country, p.birthday,
+                    p.fide_id, p.name, p.country, p.birthday, p.flag,
                     l.blitz_rating AS "rating",
                     l.blitz_change AS "ratingChange",
                     COUNT(g.id) AS "count",

@@ -16,6 +16,7 @@ public class FullTopRatingDTO {
     private String name;
     private String country;
     private Short year;
+    private String flag;
     private Double rating;
     private Double ratingChange;
     private Long count;
@@ -27,6 +28,7 @@ public class FullTopRatingDTO {
         this.name = dto.getName();
         this.country = dto.getCountry();
         this.year = dto.getYear();
+        this.flag = dto.getFlag();
         this.rating = dto.getRating();
         this.ratingChange = dto.getRatingChange();
         this.count = dto.getCount();
@@ -40,6 +42,7 @@ public class FullTopRatingDTO {
         response.setName(dto.getName());
         response.setCountry(dto.getCountry());
         response.setYear(dto.getYear());
+        response.setFlag(dto.getFlag());
         response.setRating(dto.getRating());
         response.setRatingChange(dto.getRatingChange());
         response.setCount(dto.getCount());

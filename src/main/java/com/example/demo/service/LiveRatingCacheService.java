@@ -27,8 +27,11 @@ public class LiveRatingCacheService {
     private final ObjectMapper objectMapper;
 
     private List<FullTopRatingDTO> cachedStd = new ArrayList<>();
+    private List<FullTopRatingDTO> cachedActiveStd = new ArrayList<>();
     private List<FullTopRatingDTO> cachedRapid = new ArrayList<>();
+    private List<FullTopRatingDTO> cachedActiveRapid = new ArrayList<>();
     private List<FullTopRatingDTO> cachedBlitz = new ArrayList<>();
+    private List<FullTopRatingDTO> cachedActiveBlitz = new ArrayList<>();
 
     public LiveRatingCacheService(LiveRatingRepository liveRatingRepository, ObjectMapper objectMapper) {
         this.liveRatingRepository = liveRatingRepository;
@@ -39,9 +42,29 @@ public class LiveRatingCacheService {
     @Scheduled(fixedDelay = 300000)
     public void refreshAllCaches() {
         logger.info("Refreshing in-memory ratings cache...");
+
         cachedStd = fetchAll(TimeControl.STD);
+        cachedActiveStd = populateActiveCache(cachedStd);
+
         cachedRapid = fetchAll(TimeControl.RAPID);
+        cachedActiveRapid = populateActiveCache(cachedRapid);
+
         cachedBlitz = fetchAll(TimeControl.BLITZ);
+        cachedActiveBlitz = populateActiveCache(cachedBlitz);
+    }
+
+    private List<FullTopRatingDTO> populateActiveCache(List<FullTopRatingDTO> allCache) {
+        List<FullTopRatingDTO> newCache = new ArrayList<>();
+        for(FullTopRatingDTO fullTopRatingDTO : allCache) {
+            if(isActive(fullTopRatingDTO)){
+                newCache.add(fullTopRatingDTO);
+            }
+        }
+        return newCache;
+    }
+
+    private boolean isActive(FullTopRatingDTO fullTopRatingDTO) {
+        return fullTopRatingDTO.getFlag() == null || fullTopRatingDTO.getFlag().isBlank() || fullTopRatingDTO.getCount() > 0;
     }
 
     public List<FullTopRatingDTO> fetchAll(TimeControl timeControl){
@@ -61,16 +84,16 @@ public class LiveRatingCacheService {
     }
 
 
-    public TopRatingResponseDTO findStdRatings(int page, int size, String nameOrId, SortBy sortBy, SortDirection dir) {
-        return findBySearch(cachedStd, page, size, nameOrId, sortBy, dir);
+    public TopRatingResponseDTO findStdRatings(int page, int size, String nameOrId, SortBy sortBy, SortDirection dir, boolean onlyActive) {
+        return onlyActive ? findBySearch(cachedActiveStd, page, size, nameOrId, sortBy, dir) : findBySearch(cachedStd, page, size, nameOrId, sortBy, dir);
     }
 
-    public TopRatingResponseDTO findRapidRatings(int page, int size, String nameOrId, SortBy sortBy, SortDirection dir) {
-        return findBySearch(cachedRapid, page, size, nameOrId, sortBy, dir);
+    public TopRatingResponseDTO findRapidRatings(int page, int size, String nameOrId, SortBy sortBy, SortDirection dir, boolean onlyActive) {
+        return onlyActive ? findBySearch(cachedActiveRapid, page, size, nameOrId, sortBy, dir) : findBySearch(cachedRapid, page, size, nameOrId, sortBy, dir);
     }
 
-    public TopRatingResponseDTO findBlitzRatings(int page, int size, String nameOrId, SortBy sortBy, SortDirection dir) {
-        return findBySearch(cachedBlitz, page, size, nameOrId, sortBy, dir);
+    public TopRatingResponseDTO findBlitzRatings(int page, int size, String nameOrId, SortBy sortBy, SortDirection dir, boolean onlyActive) {
+        return onlyActive ? findBySearch(cachedActiveBlitz, page, size, nameOrId, sortBy, dir) : findBySearch(cachedBlitz, page, size, nameOrId, sortBy, dir);
     }
 
     public TopRatingResponseDTO findBySearch(List<FullTopRatingDTO> cache, int page, int size, String nameOrId, SortBy sortBy, SortDirection dir){
@@ -144,16 +167,16 @@ public class LiveRatingCacheService {
         }
     }
 
-    public TopRatingResponseDTO findStdRatingsByCountry(String country, int page, int size, String nameOrFideId, SortBy sortBy, SortDirection dir) {
-        return getRatingsByCountry(cachedStd, country, page, size, nameOrFideId, sortBy, dir);
+    public TopRatingResponseDTO findStdRatingsByCountry(String country, int page, int size, String nameOrFideId, SortBy sortBy, SortDirection dir, boolean onlyActive) {
+        return onlyActive ? getRatingsByCountry(cachedActiveStd, country, page, size, nameOrFideId, sortBy, dir) : getRatingsByCountry(cachedStd, country, page, size, nameOrFideId, sortBy, dir);
     }
 
-    public TopRatingResponseDTO findRapidRatingsByCountry(String country, int page, int size, String nameOrFideId, SortBy sortBy, SortDirection dir) {
-        return getRatingsByCountry(cachedRapid, country, page, size, nameOrFideId, sortBy, dir);
+    public TopRatingResponseDTO findRapidRatingsByCountry(String country, int page, int size, String nameOrFideId, SortBy sortBy, SortDirection dir, boolean onlyActive) {
+        return onlyActive ? getRatingsByCountry(cachedActiveRapid, country, page, size, nameOrFideId, sortBy, dir) : getRatingsByCountry(cachedRapid, country, page, size, nameOrFideId, sortBy, dir);
     }
 
-    public TopRatingResponseDTO findBlitzRatingsByCountry(String country, int page, int size, String nameOrFideId, SortBy sortBy, SortDirection dir) {
-        return getRatingsByCountry(cachedBlitz, country, page, size, nameOrFideId, sortBy, dir);
+    public TopRatingResponseDTO findBlitzRatingsByCountry(String country, int page, int size, String nameOrFideId, SortBy sortBy, SortDirection dir, boolean onlyActive) {
+        return onlyActive ? getRatingsByCountry(cachedActiveBlitz, country, page, size, nameOrFideId, sortBy, dir) : getRatingsByCountry(cachedBlitz, country, page, size, nameOrFideId, sortBy, dir);
     }
 
     private TopRatingResponseDTO getRatingsByCountry(List<FullTopRatingDTO> cache, String country, int page, int size, String nameOrFideId, SortBy sortBy, SortDirection dir){
