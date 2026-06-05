@@ -13,13 +13,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.sql.Time;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static com.example.demo.utils.TimeControlParser.getLargestTimeInMinutes;
 
 @Service
 public class GameProcessingService {
@@ -194,7 +194,7 @@ public class GameProcessingService {
 
         if (timeControl != null) {
             try {
-                double timeValue = getFirstNumberFromString(timeControl.trim());
+                int timeValue = getLargestTimeInMinutes(timeControl.trim());
                 tcType = EloCalculator.findTimeControlType(timeValue);
             } catch (Exception e) {
                 // Ignore parse errors safely
@@ -302,21 +302,6 @@ public class GameProcessingService {
         return null;
     }
 
-    private double getFirstNumberFromString(String timeControl) {
-        double result = 0;
-
-        for(int i = 0; i < timeControl.length(); i++) {
-            char c = timeControl.charAt(i);
-
-            if(!Character.isDigit(c)) {
-                break;
-            }
-
-            result = result * 10 + Integer.parseInt(String.valueOf(c));
-        }
-
-        return result > 120 ? result / 60 : result;
-    }
 
     public static double addAndRound(Double current, double change) {
         double val = (current != null ? current : 0.0) + change;
