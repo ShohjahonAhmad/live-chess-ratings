@@ -55,9 +55,12 @@ public class LiveRatingCacheService {
 
     private List<FullTopRatingDTO> populateActiveCache(List<FullTopRatingDTO> allCache) {
         List<FullTopRatingDTO> newCache = new ArrayList<>();
+        int rank = 1;
         for(FullTopRatingDTO fullTopRatingDTO : allCache) {
             if(isActive(fullTopRatingDTO)){
-                newCache.add(fullTopRatingDTO);
+                FullTopRatingDTO copy = new FullTopRatingDTO(fullTopRatingDTO);
+                copy.setRank((long) rank++);
+                newCache.add(copy);
             }
         }
         return newCache;
