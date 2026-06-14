@@ -4,9 +4,13 @@ import com.example.demo.dto.MonthlyRatingsResponseDTO;
 import com.example.demo.utils.TimeControl;
 import jakarta.transaction.Transactional;
 import org.springframework.batch.core.job.Job;
+import org.springframework.batch.core.job.parameters.InvalidJobParametersException;
 import org.springframework.batch.core.job.parameters.JobParameters;
 import org.springframework.batch.core.job.parameters.JobParametersBuilder;
+import org.springframework.batch.core.launch.JobExecutionAlreadyRunningException;
+import org.springframework.batch.core.launch.JobInstanceAlreadyCompleteException;
 import org.springframework.batch.core.launch.JobOperator;
+import org.springframework.batch.core.launch.JobRestartException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
@@ -14,11 +18,13 @@ import org.springframework.stereotype.Service;
 public class MonthlyRatingsService {
     private final Job fideImportJob;
     private final Job changeActivenessJob;
+    private final Job writePeakRatingJob;
     private final JobOperator jobOperator;
 
-    public MonthlyRatingsService(@Qualifier("importPlayersJob") Job fideImportJob, @Qualifier("changeActiveness") Job changeActivenessJob, JobOperator jobOperator) {
+    public MonthlyRatingsService(@Qualifier("importPlayersJob") Job fideImportJob, @Qualifier("changeActiveness") Job changeActivenessJob, @Qualifier("writePeakRating") Job writePeakRatingJob,  JobOperator jobOperator) {
         this.fideImportJob = fideImportJob;
         this.changeActivenessJob = changeActivenessJob;
+        this.writePeakRatingJob = writePeakRatingJob;
         this.jobOperator = jobOperator;
     }
 
@@ -32,6 +38,15 @@ public class MonthlyRatingsService {
             jobOperator.start(fideImportJob, jobParams);
 
             return new MonthlyRatingsResponseDTO(true ,"Import job completed successfully");
+        } catch (Exception e) {
+            return new MonthlyRatingsResponseDTO(false, e.getMessage());
+        }
+    }
+
+    public MonthlyRatingsResponseDTO writePeakRatings() {
+        try{
+            jobOperator.start(writePeakRatingJob, new JobParameters());
+            return new MonthlyRatingsResponseDTO(true, "Write peak ratings job completed successfully");
         } catch (Exception e) {
             return new MonthlyRatingsResponseDTO(false, e.getMessage());
         }

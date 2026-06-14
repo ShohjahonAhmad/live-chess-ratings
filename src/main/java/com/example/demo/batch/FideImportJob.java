@@ -1,6 +1,5 @@
 package com.example.demo.batch;
 
-import com.example.demo.dto.PlayerActivenessDTO;
 import com.example.demo.entity.Player;
 import com.example.demo.entity.Rating;
 import com.example.demo.repository.PlayerRepository;

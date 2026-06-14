@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.time.LocalDate;
 import java.util.List;
 
 @Data
@@ -17,6 +19,8 @@ public class FullTopRatingDTO {
     private String country;
     private Short year;
     private String flag;
+    private Short peakRating;
+    private LocalDate peakRatingDate;
     private Double rating;
     private Double ratingChange;
     private Long count;
@@ -29,6 +33,8 @@ public class FullTopRatingDTO {
         this.country = dto.getCountry();
         this.year = dto.getYear();
         this.flag = dto.getFlag();
+        this.peakRating = dto.getPeakRating();
+        this.peakRatingDate = dto.getPeakRatingDate();
         this.rating = dto.getRating();
         this.ratingChange = dto.getRatingChange();
         this.count = dto.getCount();
@@ -43,6 +49,8 @@ public class FullTopRatingDTO {
         response.setCountry(dto.getCountry());
         response.setYear(dto.getYear());
         response.setFlag(dto.getFlag());
+        response.setPeakRating(dto.getPeakRating());
+        response.setPeakRatingDate(dto.getPeakRatingDate());
         response.setRating(dto.getRating());
         response.setRatingChange(dto.getRatingChange());
         response.setCount(dto.getCount());

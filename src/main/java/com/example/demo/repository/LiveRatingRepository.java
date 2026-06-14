@@ -52,7 +52,7 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
                 )
                 SELECT
                     ROW_NUMBER() OVER (ORDER BY l.std_rating DESC) AS "rank",
-                    p.fide_id, p.name, p.country, p.birthday, p.flag,
+                    p.fide_id, p.name, p.country, p.birthday, p.flag, pr.rating AS "peakRating", pr.rating_date AS "peakRatingDate",
                     l.std_rating AS "rating",
                     l.std_change AS "ratingChange",
                     COUNT(g.id) AS "count",
@@ -72,13 +72,14 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
                     ) FILTER (WHERE g.id IS NOT NULL) AS "recentGames"
                 FROM live_ratings l
                 JOIN players p ON l.fide_id = p.fide_id
+                LEFT JOIN peak_ratings pr ON pr.fide_id = l.fide_id AND pr.time_control = 'STD'
                 LEFT JOIN player_games g
                     ON g.fide_id = p.fide_id
                 LEFT JOIN rounds r ON g.round_id = r.id
                 LEFT JOIN tournaments t ON r.tournament_id = t.id
                 LEFT JOIN players wp ON g.white_fide_id = wp.fide_id
                 LEFT JOIN players bp ON g.black_fide_id = bp.fide_id
-                GROUP BY p.fide_id, p.name, p.country, p.birthday, l.std_rating, l.std_change
+                GROUP BY p.fide_id, p.name, p.country, p.birthday, pr.rating, pr.rating_date, l.std_rating, l.std_change
                 ORDER BY l.std_rating DESC;
             """;
 
@@ -122,7 +123,7 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
                 )
                 SELECT
                     ROW_NUMBER() OVER (ORDER BY l.rapid_rating DESC) AS "rank",
-                    p.fide_id, p.name, p.country, p.birthday, p.flag,
+                    p.fide_id, p.name, p.country, p.birthday, p.flag, pr.rating AS "peakRating", pr.rating_date AS "peakRatingDate",
                     l.rapid_rating AS "rating",
                     l.rapid_change AS "ratingChange",
                     COUNT(g.id) AS "count",
@@ -142,13 +143,14 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
                     ) FILTER (WHERE g.id IS NOT NULL) AS "recentGames"
                 FROM live_ratings l
                 JOIN players p ON l.fide_id = p.fide_id
+                LEFT JOIN peak_ratings pr ON pr.fide_id = l.fide_id AND pr.time_control = 'RAPID'
                 LEFT JOIN player_games g
                     ON g.fide_id = p.fide_id
                 LEFT JOIN rounds r ON g.round_id = r.id
                 LEFT JOIN tournaments t ON r.tournament_id = t.id
                 LEFT JOIN players wp ON g.white_fide_id = wp.fide_id
                 LEFT JOIN players bp ON g.black_fide_id = bp.fide_id
-                GROUP BY p.fide_id, p.name, p.country, p.birthday, l.rapid_rating, l.rapid_change
+                GROUP BY p.fide_id, p.name, p.country, p.birthday, pr.rating, pr.rating_date, l.rapid_rating, l.rapid_change
                 ORDER BY l.rapid_rating DESC;
             """;
 
@@ -192,7 +194,7 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
                 )
                 SELECT
                     ROW_NUMBER() OVER (ORDER BY l.blitz_rating DESC) AS "rank",
-                    p.fide_id, p.name, p.country, p.birthday, p.flag,
+                    p.fide_id, p.name, p.country, p.birthday, p.flag, pr.rating AS "peakRating", pr.rating_date AS "peakRatingDate",
                     l.blitz_rating AS "rating",
                     l.blitz_change AS "ratingChange",
                     COUNT(g.id) AS "count",
@@ -212,13 +214,14 @@ public interface LiveRatingRepository extends JpaRepository<LiveRating, Long> {
                     ) FILTER (WHERE g.id IS NOT NULL) AS "recentGames"
                 FROM live_ratings l
                 JOIN players p ON l.fide_id = p.fide_id
+                LEFT JOIN peak_ratings pr ON pr.fide_id = l.fide_id AND pr.time_control = 'BLITZ'
                 LEFT JOIN player_games g
                     ON g.fide_id = p.fide_id
                 LEFT JOIN rounds r ON g.round_id = r.id
                 LEFT JOIN tournaments t ON r.tournament_id = t.id
                 LEFT JOIN players wp ON g.white_fide_id = wp.fide_id
                 LEFT JOIN players bp ON g.black_fide_id = bp.fide_id
-                GROUP BY p.fide_id, p.name, p.country, p.birthday, l.blitz_rating, l.blitz_change
+                GROUP BY p.fide_id, p.name, p.country, p.birthday, pr.rating, pr.rating_date, l.blitz_rating, l.blitz_change
                 HAVING p.blitz_flag = '' OR p.blitz_flag NOT IN ('i', 'wi') OR COUNT(g.id) > 0
                 ORDER BY l.blitz_rating DESC;
             """;
